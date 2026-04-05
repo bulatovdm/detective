@@ -938,13 +938,12 @@ detective-php/
 - [x] **CLI trigger** — `debug_command` MCP tool. Дебаг artisan/console/любых PHP-команд. `TriggerStrategy` pattern: `HttpTriggerStrategy` (acceptBeforeTrigger=false), `CliTriggerStrategy` (acceptBeforeTrigger=true). Configurable `php.cli.exec` template для OrbStack/Docker/локального запуска.
 - [x] **Breakpoint schema** вынесена в общий модуль `breakpointSchema.ts`, переиспользуется обоими tools.
 
-### Фаза 4 — Watchpoints + Inspect + Profile
+### Фаза 4 — Watchpoints + Profile + Collectors
 
 - [ ] `SetWatchpointsTool` (persistent breakpoints между вызовами)
-- [ ] `InspectTool` (роуты, контейнер, миграции)
 - [ ] `ProfileRequestTool` (cachegrind parsing)
 - [ ] DBGp Proxy support (сосуществование с PhpStorm)
-- [ ] PHP Composer-пакет с `CollectorInterface`
+- [ ] PHP Composer-пакет с `CollectorInterface` (SQL-запросы, логи, events, cache)
 
 ### Фаза 5 — Мультиязычность (по необходимости)
 
