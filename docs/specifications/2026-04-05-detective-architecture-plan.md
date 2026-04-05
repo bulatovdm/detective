@@ -932,14 +932,15 @@ detective-php/
 - [x] **HTTP response body в snapshot** — `detach` вместо `stop` после сбора данных. PHP завершает обработку, HTTP-ответ приходит.
 - [x] **Multi-step snapshot** — несколько line breakpoints + exception breakpoints в одном запросе, каждый хит собирается отдельно.
 
-### Фаза 3 — SnapshotTruncator + Watchpoints
+### Фаза 3 — SnapshotTruncator + CLI Trigger ✅
 
-- [x] `SnapshotTruncator` (умная обрезка: лимит глубины, детей, строк, фильтрация DI-шума)
+- [x] `SnapshotTruncator` — умная обрезка: лимит глубины, детей, строк. Фильтрация DI-шума по классу (`NOISE_CLASS_PATTERNS`) и размеру (50+ children). Без хардкода имён свойств.
+- [x] **CLI trigger** — `debug_command` MCP tool. Дебаг artisan/console/любых PHP-команд. `TriggerStrategy` pattern: `HttpTriggerStrategy` (acceptBeforeTrigger=false), `CliTriggerStrategy` (acceptBeforeTrigger=true). Configurable `php.cli.exec` template для OrbStack/Docker/локального запуска.
+- [x] **Breakpoint schema** вынесена в общий модуль `breakpointSchema.ts`, переиспользуется обоими tools.
+
+### Фаза 4 — Watchpoints + Inspect + Profile
+
 - [ ] `SetWatchpointsTool` (persistent breakpoints между вызовами)
-
-### Фаза 4 — Inspect + Profile + CLI
-
-- [ ] CLI trigger (debug artisan-команд, не только HTTP)
 - [ ] `InspectTool` (роуты, контейнер, миграции)
 - [ ] `ProfileRequestTool` (cachegrind parsing)
 - [ ] DBGp Proxy support (сосуществование с PhpStorm)
