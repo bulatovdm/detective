@@ -14,12 +14,20 @@ export interface CliTrigger {
 
 export type Trigger = RequestTrigger | CliTrigger;
 
-export interface BreakpointDefinition {
+export interface LineBreakpoint {
+  type?: 'line';
   file: string;
   line: number;
   condition?: string;
   hitCount?: number;
 }
+
+export interface ExceptionBreakpoint {
+  type: 'exception';
+  exception: string;
+}
+
+export type BreakpointDefinition = LineBreakpoint | ExceptionBreakpoint;
 
 export interface DebugSessionParams {
   trigger: Trigger;

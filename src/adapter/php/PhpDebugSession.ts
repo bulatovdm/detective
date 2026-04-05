@@ -8,6 +8,8 @@ import {
 import { DBGP_STATUS, type DbgpInitPacket, type DbgpProperty } from './dbgp/DbgpProtocol.js';
 import { PathMapper } from '../../core/path/PathMapper.js';
 import { Logger } from '../../core/util/Logger.js';
+import { BreakpointStrategyFactory } from './breakpoint/BreakpointStrategyFactory.js';
+import type { BreakpointStrategy } from './breakpoint/BreakpointStrategy.js';
 import type {
   BreakpointDefinition,
   BreakpointHit,
@@ -32,11 +34,13 @@ export interface DebugSessionResultData {
 }
 
 const LOCAL_CONTEXT_ID = 0;
+const MAX_NON_CONSUMING_HITS = 10;
 
 export class PhpDebugSession {
   private readonly connection: DbgpConnection;
   private readonly commandBuilder = new DbgpCommandBuilder();
   private readonly logger = new Logger('PhpDebugSession');
+  private readonly strategyFactory: BreakpointStrategyFactory;
   private initPacket: DbgpInitPacket | null = null;
 
   constructor(
@@ -45,6 +49,7 @@ export class PhpDebugSession {
     private readonly port: number,
   ) {
     this.connection = new DbgpConnection();
+    this.strategyFactory = new BreakpointStrategyFactory(pathMapper);
   }
 
   async listen(): Promise<void> {
@@ -64,28 +69,33 @@ export class PhpDebugSession {
     const startTime = Date.now();
     const hits: BreakpointHit[] = [];
     const errors: ErrorInfo[] = [];
-    const breakpointIds: string[] = [];
 
     try {
-      for (const bp of options.breakpoints) {
-        const fileUri = this.toFileUri(this.pathMapper.toDebugger(bp.file));
-        const cmd = this.commandBuilder.breakpointSet(fileUri, bp.line, bp.condition);
-        const response = await this.connection.sendCommand(cmd);
-        const parsed = parseBreakpointResponse(response);
-        breakpointIds.push(parsed.id);
-      }
+      const strategies = options.breakpoints.map((bp) => this.strategyFactory.create(bp));
+      await this.installBreakpoints(strategies);
 
+      const consumingRunsTotal = strategies.filter((s) => s.consumesRun).length;
+      const maxRuns = Math.max(consumingRunsTotal, 1);
+      let consumingHits = 0;
+      let nonConsumingHits = 0;
       let hitNumber = 0;
 
-      for (let i = 0; i < options.breakpoints.length; i++) {
+      while (consumingHits < maxRuns && nonConsumingHits < MAX_NON_CONSUMING_HITS) {
         const runResponse = await this.connection.sendCommand(this.commandBuilder.run());
 
-        if (runResponse.status === DBGP_STATUS.BREAK) {
-          hitNumber++;
-          const hit = await this.collectBreakpointData(hitNumber, options.expressions);
-          hits.push(hit);
-        } else {
+        if (runResponse.status !== DBGP_STATUS.BREAK) {
           break;
+        }
+
+        hitNumber++;
+        const hit = await this.collectBreakpointData(hitNumber, options.expressions);
+        hits.push(hit);
+
+        const hitStrategy = this.matchStrategy(hit, strategies);
+        if (hitStrategy?.consumesRun) {
+          consumingHits++;
+        } else {
+          nonConsumingHits++;
         }
       }
     } catch (err) {
@@ -97,7 +107,7 @@ export class PhpDebugSession {
       adapterName: 'php',
       debuggerVersion: this.initPacket?.engineVersion ?? 'unknown',
       languageVersion: this.initPacket?.language ?? 'PHP',
-      totalBreakpointsSet: breakpointIds.length,
+      totalBreakpointsSet: options.breakpoints.length,
       totalHits: hits.length,
       executionTimeMs: Date.now() - startTime,
     };
@@ -115,6 +125,20 @@ export class PhpDebugSession {
     } finally {
       await this.connection.close();
     }
+  }
+
+  private async installBreakpoints(strategies: BreakpointStrategy[]): Promise<void> {
+    for (const strategy of strategies) {
+      const cmd = strategy.buildCommand(this.commandBuilder);
+      this.logger.info(`Breakpoint: ${cmd}`);
+      const response = await this.connection.sendCommand(cmd);
+      parseBreakpointResponse(response);
+    }
+  }
+
+  private matchStrategy(hit: BreakpointHit, strategies: BreakpointStrategy[]): BreakpointStrategy | undefined {
+    return strategies.find((s) => s.consumesRun && s.matches(hit))
+      ?? strategies.find((s) => !s.consumesRun && s.matches(hit));
   }
 
   private async configureFeatures(options: DebugSessionOptions): Promise<void> {
@@ -217,10 +241,6 @@ export class PhpDebugSession {
       default:
         return prop.value ?? null;
     }
-  }
-
-  private toFileUri(path: string): string {
-    return `file://${path}`;
   }
 
   private fromFileUri(uri: string): string {

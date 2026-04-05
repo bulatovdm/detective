@@ -24,6 +24,11 @@ export class DbgpCommandBuilder {
     return cmd;
   }
 
+  breakpointSetException(exceptionName: string): string {
+    const tid = this.nextTransactionId();
+    return `${DBGP_COMMANDS.BREAKPOINT_SET} -i ${tid} -t exception -x ${exceptionName}`;
+  }
+
   breakpointRemove(breakpointId: string): string {
     const tid = this.nextTransactionId();
     return `${DBGP_COMMANDS.BREAKPOINT_REMOVE} -i ${tid} -d ${breakpointId}`;

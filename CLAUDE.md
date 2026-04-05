@@ -50,6 +50,7 @@ LLM → MCP (stdio) → DetectiveServer → PhpAdapter → DbgpConnection → Xd
 - **OOP, interface-driven.** Вся функциональность за интерфейсами: `LanguageAdapterInterface`, `ToolInterface`. Новый язык или tool = новый класс, реализующий интерфейс. Core работает только с абстракциями.
 - **TypeScript strict**, без `any`. Zod-валидация конфига. `LanguageAdapterInterface.initialize()` принимает `unknown` — каждый адаптер валидирует/кастит сам.
 - `skipTlsVerification` в конфиге управляет `NODE_TLS_REJECT_UNAUTHORIZED` (по умолчанию `true` — dev-инструмент).
+- **Описание MCP tools актуально.** При изменении поведения или параметров tool — обновлять `description` в `definition()`. LLM читает это описание для понимания возможностей инструмента.
 
 ## Подключение к проектам
 
