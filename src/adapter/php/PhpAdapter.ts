@@ -73,9 +73,11 @@ export class PhpAdapter implements LanguageAdapterInterface {
 
       const debugResult = await withTimeout(debugPromise, timeoutMs);
 
+      await session.detach();
+
       let httpResult;
       try {
-        const httpWaitMs = Math.min(timeoutMs, 5000);
+        const httpWaitMs = Math.min(timeoutMs, 10000);
         httpResult = await Promise.race([
           httpPromise,
           new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), httpWaitMs)),
@@ -91,7 +93,7 @@ export class PhpAdapter implements LanguageAdapterInterface {
       };
     } finally {
       abortController.abort();
-      await session.stop();
+      await session.close();
     }
   }
 

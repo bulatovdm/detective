@@ -6,6 +6,7 @@ export const DBGP_COMMANDS = {
   STEP_INTO: 'step_into',
   STEP_OUT: 'step_out',
   STOP: 'stop',
+  DETACH: 'detach',
   STACK_GET: 'stack_get',
   CONTEXT_GET: 'context_get',
   CONTEXT_NAMES: 'context_names',

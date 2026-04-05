@@ -115,13 +115,23 @@ export class PhpDebugSession {
     return { hits, errors, meta };
   }
 
-  async stop(): Promise<void> {
+  async detach(): Promise<void> {
+    try {
+      if (this.connection.isConnected) {
+        await this.connection.sendCommand(this.commandBuilder.detach());
+      }
+    } catch (err) {
+      this.logger.warn('Error during session detach', err instanceof Error ? err.message : err);
+    }
+  }
+
+  async close(): Promise<void> {
     try {
       if (this.connection.isConnected) {
         await this.connection.sendCommand(this.commandBuilder.stop());
       }
     } catch (err) {
-      this.logger.warn('Error during session stop', err instanceof Error ? err.message : err);
+      this.logger.warn('Error during session close', err instanceof Error ? err.message : err);
     } finally {
       await this.connection.close();
     }

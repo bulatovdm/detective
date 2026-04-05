@@ -44,6 +44,11 @@ export class DbgpCommandBuilder {
     return `${DBGP_COMMANDS.STOP} -i ${tid}`;
   }
 
+  detach(): string {
+    const tid = this.nextTransactionId();
+    return `${DBGP_COMMANDS.DETACH} -i ${tid}`;
+  }
+
   stackGet(): string {
     const tid = this.nextTransactionId();
     return `${DBGP_COMMANDS.STACK_GET} -i ${tid}`;
