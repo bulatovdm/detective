@@ -8,14 +8,13 @@ import type {
   InspectionResult,
   ProfileParams,
   ProfileResult,
-  RequestTrigger,
 } from '../../core/adapter/types.js';
 import { PathMapper } from '../../core/path/PathMapper.js';
-import { buildRequest } from '../../core/http/RequestBuilder.js';
-import { executeRequest } from '../../core/http/RequestExecutor.js';
 import { withTimeout } from '../../core/util/Timeout.js';
 import { Logger } from '../../core/util/Logger.js';
 import { PhpDebugSession } from './PhpDebugSession.js';
+import { TriggerStrategyFactory } from './trigger/TriggerStrategyFactory.js';
+import type { TriggerStrategy, TriggerResult } from './trigger/TriggerStrategy.js';
 import type { PhpAdapterFullConfig } from './config/PhpAdapterConfig.js';
 
 export class PhpAdapter implements LanguageAdapterInterface {
@@ -24,6 +23,7 @@ export class PhpAdapter implements LanguageAdapterInterface {
   private config: PhpAdapterFullConfig | null = null;
   private pathMapper: PathMapper | null = null;
   private readonly logger = new Logger('PhpAdapter');
+  private readonly triggerFactory = new TriggerStrategyFactory();
 
   async initialize(rawConfig: unknown): Promise<void> {
     const config = rawConfig as PhpAdapterFullConfig;
@@ -51,13 +51,12 @@ export class PhpAdapter implements LanguageAdapterInterface {
     );
 
     const abortController = new AbortController();
+    const triggerStrategy = this.triggerFactory.create(params, config, abortController.signal);
 
     try {
       await session.listen();
 
-      const httpPromise = this.executeTrigger(params.trigger, abortController.signal);
-
-      session.startAccepting();
+      const triggerPromise = this.fireTrigger(session, triggerStrategy);
 
       const sessionOptions = {
         breakpoints: params.breakpoints,
@@ -75,18 +74,20 @@ export class PhpAdapter implements LanguageAdapterInterface {
 
       await session.detach();
 
-      let httpResult;
+      let triggerResult: TriggerResult = {};
       try {
-        const httpWaitMs = Math.min(timeoutMs, 10000);
-        httpResult = await Promise.race([
-          httpPromise,
-          new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), httpWaitMs)),
+        const waitMs = Math.min(timeoutMs, 10000);
+        const result = await Promise.race([
+          triggerPromise,
+          new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), waitMs)),
         ]);
+        if (result) triggerResult = result;
       } catch {
       }
 
       return {
-        response: params.trigger.type === 'http' ? httpResult : undefined,
+        response: triggerResult.response,
+        output: triggerResult.output,
         hits: debugResult.hits,
         errors: debugResult.errors,
         meta: debugResult.meta,
@@ -98,11 +99,11 @@ export class PhpAdapter implements LanguageAdapterInterface {
   }
 
   async evaluate(_expression: string, _context: EvalContext): Promise<EvalResult> {
-    throw new Error('eval is not implemented in Phase 1');
+    throw new Error('Not implemented');
   }
 
   async inspect(_what: string, _params?: Record<string, unknown>): Promise<InspectionResult> {
-    throw new Error('inspect is not implemented in Phase 1');
+    throw new Error('Not implemented');
   }
 
   availableInspections(): InspectionDescriptor[] {
@@ -110,22 +111,17 @@ export class PhpAdapter implements LanguageAdapterInterface {
   }
 
   async profile(_params: ProfileParams): Promise<ProfileResult> {
-    throw new Error('profile is not implemented in Phase 1');
+    throw new Error('Not implemented');
   }
 
-  private executeTrigger(trigger: DebugSessionParams['trigger'], signal?: AbortSignal) {
-    const { config } = this.getInitialized();
-
-    if (trigger.type === 'http') {
-      const request = buildRequest(
-        trigger as RequestTrigger,
-        config.appUrl,
-        config.php.xdebug.ideKey,
-      );
-      return executeRequest(request, config.defaults.maxResponseBodyLength, signal);
+  private fireTrigger(session: PhpDebugSession, strategy: TriggerStrategy): Promise<TriggerResult> {
+    if (strategy.acceptBeforeTrigger) {
+      session.startAccepting();
+      return strategy.execute();
     }
-
-    throw new Error('CLI trigger is not implemented in Phase 1');
+    const promise = strategy.execute();
+    session.startAccepting();
+    return promise;
   }
 
   private getInitialized(): { config: PhpAdapterFullConfig; pathMapper: PathMapper } {

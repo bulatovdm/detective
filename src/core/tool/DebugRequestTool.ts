@@ -1,33 +1,11 @@
 import { z } from 'zod';
 import type { ToolInterface, ToolDefinition } from './ToolInterface.js';
 import type { LanguageAdapterInterface } from '../adapter/LanguageAdapterInterface.js';
-import type { BreakpointDefinition, RequestTrigger } from '../adapter/types.js';
+import type { RequestTrigger } from '../adapter/types.js';
 import { formatSnapshot } from '../snapshot/SnapshotFormatter.js';
 import { truncateSnapshot } from '../snapshot/SnapshotTruncator.js';
+import { breakpointSchema, toBreakpointDefinitions } from './breakpointSchema.js';
 import { Logger } from '../util/Logger.js';
-
-const explicitLineBreakpointSchema = z.object({
-  type: z.literal('line'),
-  file: z.string().describe('File path relative to project root'),
-  line: z.number().int().positive(),
-  condition: z.string().optional(),
-});
-
-const exceptionBreakpointSchema = z.object({
-  type: z.literal('exception'),
-  exception: z.string().describe('Exception class name or "*" for all exceptions'),
-});
-
-const implicitLineBreakpointSchema = z.object({
-  file: z.string().describe('File path relative to project root'),
-  line: z.number().int().positive(),
-  condition: z.string().optional(),
-});
-
-const breakpointSchema = z.discriminatedUnion('type', [
-  explicitLineBreakpointSchema,
-  exceptionBreakpointSchema,
-]).or(implicitLineBreakpointSchema);
 
 const inputSchema = z.object({
   url: z.string().describe('URL path to request (e.g. /api/orders)'),
@@ -74,22 +52,9 @@ export class DebugRequestTool implements ToolInterface {
       body: input.body,
     };
 
-    const breakpoints: BreakpointDefinition[] = input.breakpoints.map((bp) => {
-      if ('type' in bp && bp.type === 'exception') {
-        return { type: 'exception' as const, exception: bp.exception };
-      }
-      const lineBp = bp as z.infer<typeof implicitLineBreakpointSchema>;
-      return {
-        type: 'line' as const,
-        file: lineBp.file,
-        line: lineBp.line,
-        condition: lineBp.condition,
-      };
-    });
-
     const result = await this.adapter.executeDebugSession({
       trigger,
-      breakpoints,
+      breakpoints: toBreakpointDefinitions(input.breakpoints),
       expressions: input.expressions,
       maxDepth: input.maxDepth,
       timeout: input.timeout,

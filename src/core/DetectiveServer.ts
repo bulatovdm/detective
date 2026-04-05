@@ -4,6 +4,7 @@ import type { DetectiveConfig } from './config/Config.js';
 import { AdapterRegistry } from './adapter/AdapterRegistry.js';
 import { ToolRegistry } from './tool/ToolRegistry.js';
 import { DebugRequestTool } from './tool/DebugRequestTool.js';
+import { DebugCommandTool } from './tool/DebugCommandTool.js';
 import { PhpAdapter } from '../adapter/php/PhpAdapter.js';
 import { extractPhpConfig } from '../adapter/php/config/PhpAdapterConfig.js';
 import { Logger } from './util/Logger.js';
@@ -46,6 +47,7 @@ export class DetectiveServer {
   private registerTools(): void {
     const adapter = this.adapterRegistry.get(this.config.adapter);
     this.toolRegistry.register(new DebugRequestTool(adapter));
+    this.toolRegistry.register(new DebugCommandTool(adapter));
   }
 
   private registerMcpTools(): void {

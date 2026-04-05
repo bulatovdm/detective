@@ -142,7 +142,10 @@ xdebug.client_port = 9003
       "ideKey": "detective"
     },
     "binary": "php",
-    "artisanPath": "./artisan"
+    "artisanPath": "./artisan",
+    "cli": {
+      "exec": "{command}"
+    }
   },
   "pathMapping": {},
   "defaults": {
@@ -156,7 +159,9 @@ xdebug.client_port = 9003
 }
 ```
 
-## MCP Tool: debug_request
+## MCP Tools
+
+### debug_request — HTTP-запрос с breakpoints
 
 ```
 debug_request({
@@ -166,7 +171,8 @@ debug_request({
   body: { product_id: 1 },
   breakpoints: [
     { file: "app/Controllers/OrderController.php", line: 25 },
-    { file: "app/Services/OrderService.php", line: 42, condition: "$total > 1000" }
+    { file: "app/Services/OrderService.php", line: 42, condition: "$total > 1000" },
+    { type: "exception", exception: "*" }
   ],
   expressions: ["$this->connection->getName()", "count($items)"],
   maxDepth: 3,
@@ -174,18 +180,36 @@ debug_request({
 })
 ```
 
-### Параметры
+### debug_command — CLI-команда с breakpoints
+
+```
+debug_command({
+  command: "php bin/console db:find pages 1",
+  breakpoints: [
+    { file: "app/Tasks/FindPageTask.php", line: 15 }
+  ],
+  timeout: 15
+})
+```
+
+Команда выполняется через шаблон `php.cli.exec` из `detective.json`. Для OrbStack/Docker — настроить шаблон с wrapper'ом.
+
+### Типы breakpoints
+
+| Тип | Формат | Описание |
+|-----|--------|----------|
+| Line | `{ file, line }` | Остановка на конкретной строке файла |
+| Line с условием | `{ file, line, condition }` | Остановка если PHP-выражение истинно |
+| Exception (все) | `{ type: "exception", exception: "*" }` | Ловит все исключения и warnings |
+| Exception (класс) | `{ type: "exception", exception: "App\\Exceptions\\NotFound" }` | Ловит конкретный класс |
+
+Exception breakpoints не блокируют line breakpoints — оба типа работают вместе.
+
+### Общие параметры
 
 | Параметр | Тип | Обязательный | Описание |
 |----------|-----|:---:|----------|
-| url | string | да | URL path (e.g. `/api/orders`) |
-| method | string | нет | HTTP method, default `GET` |
-| headers | object | нет | HTTP заголовки |
-| body | any | нет | Тело запроса |
-| breakpoints | array | да | Массив breakpoints |
-| breakpoints[].file | string | да | Путь относительно корня проекта |
-| breakpoints[].line | number | да | Номер строки |
-| breakpoints[].condition | string | нет | PHP-выражение для conditional breakpoint |
+| breakpoints | array | да | Массив breakpoints (line и/или exception) |
 | expressions | array | нет | PHP-выражения для eval в контексте breakpoint |
 | maxDepth | number | нет | Глубина сбора переменных (1-10), default 3 |
 | timeout | number | нет | Таймаут в секундах (1-120), default 30 |
@@ -233,12 +257,17 @@ src/
 │   ├── tool/
 │   │   ├── ToolInterface.ts
 │   │   ├── ToolRegistry.ts
-│   │   └── DebugRequestTool.ts
+│   │   ├── DebugRequestTool.ts
+│   │   ├── DebugCommandTool.ts
+│   │   └── breakpointSchema.ts
 │   ├── snapshot/
-│   │   └── SnapshotFormatter.ts
+│   │   ├── SnapshotFormatter.ts
+│   │   └── SnapshotTruncator.ts
 │   ├── http/
 │   │   ├── RequestBuilder.ts
 │   │   └── RequestExecutor.ts
+│   ├── cli/
+│   │   └── CliExecutor.ts
 │   ├── path/
 │   │   └── PathMapper.ts
 │   ├── config/
@@ -252,6 +281,16 @@ src/
     ├── PhpAdapter.ts
     ├── PhpDebugSession.ts
     ├── config/PhpAdapterConfig.ts
+    ├── breakpoint/
+    │   ├── BreakpointStrategy.ts
+    │   ├── LineBreakpointStrategy.ts
+    │   ├── ExceptionBreakpointStrategy.ts
+    │   └── BreakpointStrategyFactory.ts
+    ├── trigger/
+    │   ├── TriggerStrategy.ts
+    │   ├── HttpTriggerStrategy.ts
+    │   ├── CliTriggerStrategy.ts
+    │   └── TriggerStrategyFactory.ts
     └── dbgp/
         ├── DbgpConnection.ts
         ├── DbgpCommandBuilder.ts

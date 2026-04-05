@@ -17,14 +17,16 @@ npx vitest run tests/core/path/PathMapper.test.ts
 
 ## Что это
 
-Detective — MCP-сервер для LLM-driven runtime-дебага PHP-приложений. Подключается к Xdebug по протоколу DBGp, ставит breakpoints, выполняет HTTP-запрос и возвращает snapshot переменных/стека/ошибок за один проход. Без интерактивного step-by-step — один запрос, полный результат.
+Detective — MCP-сервер для LLM-driven runtime-дебага PHP-приложений. Подключается к Xdebug по протоколу DBGp, ставит breakpoints, выполняет HTTP-запрос или CLI-команду и возвращает snapshot переменных/стека/ошибок за один проход. Без интерактивного step-by-step — один запрос, полный результат.
 
 ## Архитектура
 
 ```
 LLM → MCP (stdio) → DetectiveServer → PhpAdapter → DbgpConnection → Xdebug
                                           ↓
-                                     HTTP fetch → PHP App
+                                   TriggerStrategy
+                                    ├── HTTP fetch → PHP App
+                                    └── CLI exec  → PHP Console
 ```
 
 **Core** (`src/core/`) — языконезависимое ядро: MCP-сервер, tools, форматирование snapshot, конфиг, path mapping.
@@ -33,11 +35,16 @@ LLM → MCP (stdio) → DetectiveServer → PhpAdapter → DbgpConnection → Xd
 
 **Ключевой flow** в `PhpAdapter.executeDebugSession()`:
 1. `session.listen()` — открыть TCP-сервер
-2. `executeTrigger()` — отправить HTTP-запрос (async, не ждём)
-3. `session.startAccepting()` — начать принимать соединения Xdebug (отклоняет ранние/чужие)
+2. `fireTrigger()` — запустить trigger (HTTP fetch или CLI exec) через `TriggerStrategy`
+3. `session.startAccepting()` — порядок определяется `TriggerStrategy.acceptBeforeTrigger`
 4. `waitForConnectionAndConfigure()` — дождаться Xdebug, настроить features
-5. `runWithBreakpoints()` — установить breakpoints, run, собрать данные на каждом хите
-6. Вернуть snapshot (не ждать завершения PHP-скрипта)
+5. `runWithBreakpoints()` — установить breakpoints через `BreakpointStrategy`, run, собрать данные
+6. `session.detach()` — отсоединиться от Xdebug (PHP продолжает работу, HTTP-ответ приходит)
+
+**Полиморфизм через Strategy Pattern:**
+- `BreakpointStrategy` — `LineBreakpointStrategy` (consumesRun=true), `ExceptionBreakpointStrategy` (consumesRun=false)
+- `TriggerStrategy` — `HttpTriggerStrategy` (acceptBeforeTrigger=false), `CliTriggerStrategy` (acceptBeforeTrigger=true)
+- Фабрики создают стратегии через registry по типу, без if/switch
 
 **DBGp протокол** (`src/adapter/php/dbgp/`): TCP-соединение, XML-ответы, сообщения разделены null-байтами. `DbgpConnection` — фрейминг, `DbgpCommandBuilder` — построение команд, `DbgpResponseParser` — парсинг XML через fast-xml-parser.
 
@@ -47,7 +54,8 @@ LLM → MCP (stdio) → DetectiveServer → PhpAdapter → DbgpConnection → Xd
 
 - **Без комментариев.** Никаких комментариев в коде — ни inline, ни JSDoc, ни блочных. Код самодокументируемый: имена переменных, методов и классов должны полностью объяснять логику.
 - **Самодокументируемый bash.** Shell-скрипты в `scripts/` следуют тому же принципу: понятные имена функций (`add_to_mcp_json`, `ensure_built`, `require_project`), структура через `case`-блоки, без поясняющих комментариев.
-- **OOP, interface-driven.** Вся функциональность за интерфейсами: `LanguageAdapterInterface`, `ToolInterface`. Новый язык или tool = новый класс, реализующий интерфейс. Core работает только с абстракциями.
+- **OOP, interface-driven.** Вся функциональность за интерфейсами: `LanguageAdapterInterface`, `ToolInterface`, `BreakpointStrategy`, `TriggerStrategy`. Новый тип breakpoint, trigger или язык = новый класс, реализующий интерфейс. Core работает только с абстракциями.
+- **Полиморфизм, не if/switch.** Поведение определяется стратегиями через factory registry. Фабрики резолвят по типу (`breakpoint.type`, `trigger.type`), не через условия.
 - **TypeScript strict**, без `any`. Zod-валидация конфига. `LanguageAdapterInterface.initialize()` принимает `unknown` — каждый адаптер валидирует/кастит сам.
 - `skipTlsVerification` в конфиге управляет `NODE_TLS_REJECT_UNAUTHORIZED` (по умолчанию `true` — dev-инструмент).
 - **Описание MCP tools актуально.** При изменении поведения или параметров tool — обновлять `description` в `definition()`. LLM читает это описание для понимания возможностей инструмента.
@@ -55,7 +63,7 @@ LLM → MCP (stdio) → DetectiveServer → PhpAdapter → DbgpConnection → Xd
 ## Подключение к проектам
 
 ```bash
-./scripts/setup.sh install              # алиас 'detective' в shell
+./scripts/setup.sh install              # симлинк 'detective' в ~/.local/bin
 detective link [path] [app-url]         # добавить в .mcp.json проекта + создать detective.json
 detective status [path]                 # проверить конфигурацию
 detective unlink [path]                 # отключить от проекта
@@ -65,7 +73,12 @@ detective unlink [path]                 # отключить от проекта
 
 ## Конфиг
 
-`detective.json` в корне проекта. Валидация через Zod в `ConfigSchema.ts`. Ключевые поля: `app.url`, `php.xdebug.host/port/ideKey`, `pathMapping`, `defaults.*`.
+`detective.json` в корне проекта. Валидация через Zod в `ConfigSchema.ts`. Ключевые поля: `app.url`, `php.xdebug.host/port/ideKey`, `php.cli.exec`, `pathMapping`, `defaults.*`.
+
+`php.cli.exec` — шаблон для запуска CLI-команд. `{command}` заменяется на команду с env-переменными. Примеры:
+- Локальный PHP: `"{command}"` (по умолчанию)
+- OrbStack: `"orb -m self -u user -s \"cd ~/sites/app && {command}\""`
+- Docker: `"docker exec container {command}"`
 
 ## Тестирование на реальном приложении
 

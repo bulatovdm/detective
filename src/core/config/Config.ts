@@ -4,10 +4,15 @@ export interface XdebugConfig {
   ideKey: string;
 }
 
+export interface CliConfig {
+  exec: string;
+}
+
 export interface PhpConfig {
   xdebug: XdebugConfig;
   binary: string;
   artisanPath: string;
+  cli: CliConfig;
 }
 
 export interface AppConfig {

@@ -6,10 +6,15 @@ const xdebugSchema = z.object({
   ideKey: z.string().default('detective'),
 });
 
+const cliSchema = z.object({
+  exec: z.string().default('{command}'),
+});
+
 const phpSchema = z.object({
   xdebug: xdebugSchema.default({}),
   binary: z.string().default('php'),
   artisanPath: z.string().default('./artisan'),
+  cli: cliSchema.default({}),
 });
 
 const appSchema = z.object({
