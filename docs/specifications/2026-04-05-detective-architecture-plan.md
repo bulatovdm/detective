@@ -938,14 +938,27 @@ detective-php/
 - [x] **CLI trigger** — `debug_command` MCP tool. Дебаг artisan/console/любых PHP-команд. `TriggerStrategy` pattern: `HttpTriggerStrategy` (acceptBeforeTrigger=false), `CliTriggerStrategy` (acceptBeforeTrigger=true). Configurable `php.cli.exec` template для OrbStack/Docker/локального запуска.
 - [x] **Breakpoint schema** вынесена в общий модуль `breakpointSchema.ts`, переиспользуется обоими tools.
 
-### Фаза 4 — Watchpoints + Profile + Collectors
+### Фаза 4 — Расширенные breakpoints + Logpoints
 
-- [ ] `SetWatchpointsTool` (persistent breakpoints между вызовами)
-- [ ] `ProfileRequestTool` (cachegrind parsing)
+Идеи подсмотрены у конкурентов:
+- [kpanuragh/xdebug-mcp](https://github.com/kpanuragh/xdebug-mcp) — 41 tool, интерактивный step-by-step дебагер
+- [lazur/ts-php-debug-mcp](https://lobehub.com/mcp/lazur-php-debug-mcp) — 19 tools, DAP-based
+- [koriym/xdebug-mcp](https://github.com/koriym/xdebug-mcp) — PHP-реализация
+
+Наше преимущество — batch (один запрос → полный snapshot за 100-300мс вместо десятков step-вызовов). Фичи ниже сохраняют этот принцип.
+
+- [ ] **Function call breakpoints** — `breakpoint_set -t call -m functionName`. Новая `CallBreakpointStrategy`. LLM указывает имя метода вместо файла+строки. Полезно когда LLM знает *что* вызывается, но не знает *где*.
+- [ ] **Logpoints** — breakpoint, который не останавливает выполнение, а собирает expression и продолжает (`consumesRun=false`). Новая `LogpointBreakpointStrategy`. Позволяет трейсить поток выполнения без замедления.
+- [ ] **Watch expressions** — persistent expressions, которые автоматически eval'ятся на каждом breakpoint hit. Хранятся между вызовами `debug_request`/`debug_command`. По сути persistent аналог `expressions` параметра.
+- [ ] **Memory snapshot** — `memory_get_usage()` и `memory_get_peak_usage()` собираются на каждом breakpoint hit. Добавляется в `BreakpointHit` как `memoryUsage` / `peakMemoryUsage`. Реализуется через DBGp `eval`.
+
+### Фаза 5 — Profile + Collectors
+
+- [ ] `ProfileRequestTool` (cachegrind parsing, top-N самых тяжёлых вызовов)
 - [ ] DBGp Proxy support (сосуществование с PhpStorm)
 - [ ] PHP Composer-пакет с `CollectorInterface` (SQL-запросы, логи, events, cache)
 
-### Фаза 5 — Мультиязычность (по необходимости)
+### Фаза 6 — Мультиязычность (по необходимости)
 
 - [ ] Python adapter (debugpy / DAP)
 - [ ] Node.js adapter (V8 Inspector / CDP)
