@@ -2,7 +2,7 @@
 
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0" 2>/dev/null || readlink "$0" 2>/dev/null || echo "$0")")" && pwd)"
 DETECTIVE_DIR="$(dirname "$SCRIPT_DIR")"
 DETECTIVE_ENTRY="$DETECTIVE_DIR/dist/index.js"
 

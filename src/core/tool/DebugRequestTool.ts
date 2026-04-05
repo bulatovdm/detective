@@ -3,6 +3,7 @@ import type { ToolInterface, ToolDefinition } from './ToolInterface.js';
 import type { LanguageAdapterInterface } from '../adapter/LanguageAdapterInterface.js';
 import type { BreakpointDefinition, RequestTrigger } from '../adapter/types.js';
 import { formatSnapshot } from '../snapshot/SnapshotFormatter.js';
+import { truncateSnapshot } from '../snapshot/SnapshotTruncator.js';
 import { Logger } from '../util/Logger.js';
 
 const explicitLineBreakpointSchema = z.object({
@@ -94,6 +95,7 @@ export class DebugRequestTool implements ToolInterface {
       timeout: input.timeout,
     });
 
-    return formatSnapshot(result);
+    const truncated = truncateSnapshot(result);
+    return formatSnapshot(truncated);
   }
 }

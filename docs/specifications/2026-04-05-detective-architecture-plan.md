@@ -924,61 +924,28 @@ detective-php/
 - [x] Conditional breakpoints
 - [x] Expressions (eval в контексте breakpoint)
 
-### Фаза 2 — Exception Breakpoints + Eval Tool + HTTP Response
+### Фаза 2 — Exception Breakpoints + HTTP Response ✅
 
-Обратная связь от первого использования: нужны exception breakpoints, eval без breakpoint, и HTTP response body в snapshot.
+Обратная связь от первого использования.
 
-- [ ] **Exception breakpoints** — остановка на любом Exception/Error без указания файла/строки. DBGp поддерживает `breakpoint_set -t exception`. Критически полезно: PHP часто бросает исключения в неожиданных местах.
+- [x] **Exception breakpoints** — `breakpoint_set -t exception`. Strategy pattern: `LineBreakpointStrategy` (consumesRun=true), `ExceptionBreakpointStrategy` (consumesRun=false). Wildcard `"*"` или конкретный класс. Auto-normalize double-escaped backslashes.
+- [x] **HTTP response body в snapshot** — `detach` вместо `stop` после сбора данных. PHP завершает обработку, HTTP-ответ приходит.
+- [x] **Multi-step snapshot** — несколько line breakpoints + exception breakpoints в одном запросе, каждый хит собирается отдельно.
 
-```
-debug_request({
-  url: "/api/orders",
-  breakpoints: [
-    { type: "exception", exception: "*" },
-    { type: "exception", exception: "App\\Exceptions\\OrderException" }
-  ]
-})
-```
+### Фаза 3 — SnapshotTruncator + Watchpoints
 
-- [ ] **`EvalTool`** — выполнение PHP-кода в контексте приложения без breakpoint. Аналог `php bin/console play -e`, но через MCP. Два режима:
-  - `cli` — через `orb`/`docker exec` + `php bin/console play -e`
-  - `breakpoint` — через DBGp eval на активной debug-сессии
-
-```
-eval({
-  expression: "App\\Models\\Product::count()",
-  context: "runtime"
-})
-```
-
-- [ ] **HTTP response body в snapshot** — сейчас debug-данные возвращаются, но HTTP-ответ может не успеть. Нужно надёжно включать response status + body (хотя бы первые N символов) в каждый snapshot. Это позволяет сразу видеть: breakpoint сработал, переменные такие-то, а ответ API — 500 с ошибкой.
-
-- [ ] **Multi-step snapshot** — альтернатива step-through. LLM ставит breakpoints на нескольких строках одного метода и получает snapshot каждой точки. Покрывает кейс "что произошло после этой строки" без интерактивной сессии.
-
-```
-debug_request({
-  url: "/api/orders",
-  breakpoints: [
-    { file: "app/Services/OrderService.php", line: 42 },
-    { file: "app/Services/OrderService.php", line: 55 },
-    { file: "app/Services/OrderService.php", line: 70 }
-  ]
-})
-```
-
+- [x] `SnapshotTruncator` (умная обрезка: лимит глубины, детей, строк, фильтрация DI-шума)
 - [ ] `SetWatchpointsTool` (persistent breakpoints между вызовами)
-- [ ] `SnapshotTruncator` (умная обрезка больших данных)
 
-### Фаза 3 — Inspect + Profile + PHP-пакет
+### Фаза 4 — Inspect + Profile + CLI
 
+- [ ] CLI trigger (debug artisan-команд, не только HTTP)
 - [ ] `InspectTool` (роуты, контейнер, миграции)
 - [ ] `ProfileRequestTool` (cachegrind parsing)
 - [ ] DBGp Proxy support (сосуществование с PhpStorm)
-- [ ] CLI trigger (debug artisan-команд, не только HTTP)
 - [ ] PHP Composer-пакет с `CollectorInterface`
-- [ ] Laravel/Self-framework bridge: QueryCollector, LogCollector, EventCollector
 
-### Фаза 4 — Мультиязычность (по необходимости)
+### Фаза 5 — Мультиязычность (по необходимости)
 
 - [ ] Python adapter (debugpy / DAP)
 - [ ] Node.js adapter (V8 Inspector / CDP)
