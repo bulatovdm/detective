@@ -59,17 +59,29 @@ LLM → MCP (stdio) → DetectiveServer → PhpAdapter → DbgpConnection → Xd
 - **TypeScript strict**, без `any`. Zod-валидация конфига. `LanguageAdapterInterface.initialize()` принимает `unknown` — каждый адаптер валидирует/кастит сам.
 - `skipTlsVerification` в конфиге управляет `NODE_TLS_REJECT_UNAUTHORIZED` (по умолчанию `true` — dev-инструмент).
 - **Описание MCP tools актуально.** При изменении поведения или параметров tool — обновлять `description` в `definition()`. LLM читает это описание для понимания возможностей инструмента.
+- **Пресеты актуальны.** При добавлении/изменении MCP tools или параметров — обновлять шаблоны в `presets/claude-md/ru.md` и `presets/claude-md/en.md`. Эти шаблоны инжектятся в CLAUDE.md целевых проектов через `detective link/update`.
 
 ## Подключение к проектам
 
 ```bash
-./scripts/setup.sh install              # симлинк 'detective' в ~/.local/bin
-detective link [path] [app-url]         # добавить в .mcp.json проекта + создать detective.json
-detective status [path]                 # проверить конфигурацию
-detective unlink [path]                 # отключить от проекта
+./scripts/setup.sh install                          # симлинк 'detective' в ~/.local/bin
+detective link [path] [--preset self|default] [--lang ru|en]  # интерактивная линковка
+detective update [path] [--lang ru|en]               # обновить секцию в CLAUDE.md
+detective status [path]                              # проверить конфигурацию
+detective unlink [path]                              # отключить от проекта
 ```
 
 Без аргумента path берётся текущая директория.
+
+### Пресеты
+
+`presets/` — шаблоны конфигов и CLAUDE.md секций. Пресеты: `self` (SELF Framework + OrbStack), `default` (базовый PHP/Xdebug).
+
+- `presets/self/detective.json.tpl` — шаблон detective.json для SELF (плейсхолдеры `{{domain}}`, `{{user}}`)
+- `presets/default/detective.json.tpl` — шаблон detective.json по умолчанию (плейсхолдер `{{app_url}}`)
+- `presets/claude-md/ru.md`, `presets/claude-md/en.md` — шаблоны секции для CLAUDE.md
+
+`detective link` инжектит секцию в CLAUDE.md проекта между маркерами `<!-- detective:start -->` / `<!-- detective:end -->`. `detective update` обновляет её на актуальную версию.
 
 ## Конфиг
 
