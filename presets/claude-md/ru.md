@@ -19,6 +19,7 @@
 - **maxDepth**: 1-10, глубина раскрытия объектов (по умолчанию ставь 2-3)
 - **HTTP Response**: статус и body ответа в `debug_request`
 - **Command Output**: stdout/stderr и exit code в `debug_command`
+- **verbose**: `true` — включает session log в ответ (таймстампы каждого этапа: TCP listen, Xdebug connect, breakpoint hit). Используй при проблемах с подключением или таймаутах. При ошибке session log включается автоматически
 - Несколько брейкпоинтов в одном запросе — видишь состояние "до" и "после"
 
 ### Примеры

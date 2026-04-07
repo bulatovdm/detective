@@ -19,6 +19,7 @@ When facing issues, use `mcp__detective__debug_request` and `mcp__detective__deb
 - **maxDepth**: 1-10, object expansion depth (default to 2-3)
 - **HTTP Response**: status and body in `debug_request`
 - **Command Output**: stdout/stderr and exit code in `debug_command`
+- **verbose**: `true` — includes session log in the response (timestamps for each stage: TCP listen, Xdebug connect, breakpoint hit). Use when debugging connection or timeout issues. On errors, session log is included automatically
 - Multiple breakpoints in one request — see state "before" and "after"
 
 ### Examples

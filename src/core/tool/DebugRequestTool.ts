@@ -16,6 +16,7 @@ const inputSchema = z.object({
   expressions: z.array(z.string()).optional(),
   maxDepth: z.number().int().min(1).max(10).optional(),
   timeout: z.number().min(1).max(120).optional(),
+  verbose: z.boolean().optional().describe('Include session log in the response for debugging connection/timing issues'),
 });
 
 type DebugRequestInput = z.infer<typeof inputSchema>;
@@ -58,6 +59,7 @@ export class DebugRequestTool implements ToolInterface {
       expressions: input.expressions,
       maxDepth: input.maxDepth,
       timeout: input.timeout,
+      verbose: input.verbose,
     });
 
     const truncated = truncateSnapshot(result);

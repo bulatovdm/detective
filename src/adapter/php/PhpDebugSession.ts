@@ -8,6 +8,7 @@ import {
 import { DBGP_STATUS, type DbgpInitPacket, type DbgpProperty } from './dbgp/DbgpProtocol.js';
 import { PathMapper } from '../../core/path/PathMapper.js';
 import { Logger } from '../../core/util/Logger.js';
+import { SessionLog } from '../../core/session/SessionLog.js';
 import { BreakpointStrategyFactory } from './breakpoint/BreakpointStrategyFactory.js';
 import type { BreakpointStrategy } from './breakpoint/BreakpointStrategy.js';
 import type {
@@ -47,6 +48,7 @@ export class PhpDebugSession {
     private readonly pathMapper: PathMapper,
     private readonly host: string,
     private readonly port: number,
+    private readonly sessionLog: SessionLog,
   ) {
     this.connection = new DbgpConnection();
     this.strategyFactory = new BreakpointStrategyFactory(pathMapper);
@@ -62,7 +64,9 @@ export class PhpDebugSession {
 
   async waitForConnectionAndConfigure(timeoutMs: number, options: DebugSessionOptions): Promise<void> {
     this.initPacket = await this.connection.waitForConnection(timeoutMs);
+    this.sessionLog.add('Xdebug connected');
     await this.configureFeatures(options);
+    this.sessionLog.add('Session configured');
   }
 
   async runWithBreakpoints(options: DebugSessionOptions): Promise<DebugSessionResultData> {
@@ -80,16 +84,20 @@ export class PhpDebugSession {
       let nonConsumingHits = 0;
       let hitNumber = 0;
 
+      this.sessionLog.add('Running to breakpoints');
+
       while (consumingHits < maxRuns && nonConsumingHits < MAX_NON_CONSUMING_HITS) {
         const runResponse = await this.connection.sendCommand(this.commandBuilder.run());
 
         if (runResponse.status !== DBGP_STATUS.BREAK) {
+          this.sessionLog.add(`Run finished without break (status: ${runResponse.status})`);
           break;
         }
 
         hitNumber++;
         const hit = await this.collectBreakpointData(hitNumber, options.expressions);
         hits.push(hit);
+        this.sessionLog.add(`Breakpoint hit #${hitNumber} at ${hit.file}:${hit.line}`);
 
         const hitStrategy = this.matchStrategy(hit, strategies);
         if (hitStrategy?.consumesRun) {
@@ -144,6 +152,7 @@ export class PhpDebugSession {
       const response = await this.connection.sendCommand(cmd);
       parseBreakpointResponse(response);
     }
+    this.sessionLog.add(`Breakpoints installed (${strategies.length})`);
   }
 
   private matchStrategy(hit: BreakpointHit, strategies: BreakpointStrategy[]): BreakpointStrategy | undefined {

@@ -35,6 +35,7 @@ export interface DebugSessionParams {
   expressions?: string[];
   maxDepth?: number;
   timeout?: number;
+  verbose?: boolean;
 }
 
 export interface DebugSessionResult {
@@ -43,6 +44,7 @@ export interface DebugSessionResult {
   hits: BreakpointHit[];
   errors: ErrorInfo[];
   meta: SessionMeta;
+  sessionLog?: string;
 }
 
 export interface HttpResponse {

@@ -12,6 +12,7 @@ import type {
 import { PathMapper } from '../../core/path/PathMapper.js';
 import { withTimeout, TimeoutError } from '../../core/util/Timeout.js';
 import { Logger } from '../../core/util/Logger.js';
+import { SessionLog } from '../../core/session/SessionLog.js';
 import { PhpDebugSession } from './PhpDebugSession.js';
 import { TriggerStrategyFactory } from './trigger/TriggerStrategyFactory.js';
 import type { TriggerStrategy, TriggerResult } from './trigger/TriggerStrategy.js';
@@ -49,9 +50,12 @@ export class PhpAdapter implements LanguageAdapterInterface {
   async executeDebugSession(params: DebugSessionParams): Promise<DebugSessionResult> {
     const { config, pathMapper } = this.getInitialized();
     const timeoutMs = (params.timeout ?? config.defaults.timeout) * 1000;
+    const sessionLog = new SessionLog();
+    const includeLog = params.verbose ?? false;
 
     if (this.activeSession) {
       this.logger.warn('Previous session still active, force-closing');
+      sessionLog.add('Force-closing previous active session');
       await this.activeSession.close().catch(() => {});
       this.activeSession = null;
     }
@@ -60,18 +64,22 @@ export class PhpAdapter implements LanguageAdapterInterface {
       pathMapper,
       config.php.xdebug.host,
       config.php.xdebug.port,
+      sessionLog,
     );
     this.activeSession = session;
 
     const abortController = new AbortController();
     const triggerStrategy = this.triggerFactory.create(params, config, abortController.signal);
 
+    sessionLog.add(`Starting debug session (timeout: ${timeoutMs}ms, breakpoints: ${params.breakpoints.length})`);
+
     let sessionStage = 'waiting for Xdebug connection';
 
     try {
       await session.listen();
+      sessionLog.add(`TCP server listening on ${config.php.xdebug.host}:${config.php.xdebug.port}`);
 
-      const triggerPromise = this.fireTrigger(session, triggerStrategy);
+      const triggerPromise = this.fireTrigger(session, triggerStrategy, sessionLog);
 
       const sessionOptions = {
         breakpoints: params.breakpoints,
@@ -80,6 +88,8 @@ export class PhpAdapter implements LanguageAdapterInterface {
         maxChildren: config.defaults.maxChildren,
         maxDataSize: config.defaults.maxDataSize,
       };
+
+      sessionLog.add('Waiting for Xdebug connection');
 
       const debugPromise = session.waitForConnectionAndConfigure(timeoutMs, sessionOptions).then(() => {
         sessionStage = 'running with breakpoints';
@@ -91,12 +101,18 @@ export class PhpAdapter implements LanguageAdapterInterface {
         debugResult = await withTimeout(debugPromise, timeoutMs);
       } catch (err) {
         if (err instanceof TimeoutError) {
-          throw new TimeoutError(timeoutMs, sessionStage);
+          sessionLog.add(`Timeout during: ${sessionStage}`);
+        } else {
+          sessionLog.add(`Error: ${err instanceof Error ? err.message : String(err)}`);
         }
-        throw err;
+        const message = err instanceof Error ? err.message : String(err);
+        throw new Error(`${message}\n\nSession log:\n${sessionLog.format()}`);
       }
 
+      sessionLog.add(`Debug session completed (hits: ${debugResult.hits.length})`);
+
       await session.detach();
+      sessionLog.add('Detached from Xdebug');
 
       let triggerResult: TriggerResult = {};
       try {
@@ -115,6 +131,7 @@ export class PhpAdapter implements LanguageAdapterInterface {
         hits: debugResult.hits,
         errors: debugResult.errors,
         meta: debugResult.meta,
+        sessionLog: includeLog ? sessionLog.format() : undefined,
       };
     } finally {
       abortController.abort();
@@ -139,7 +156,10 @@ export class PhpAdapter implements LanguageAdapterInterface {
     throw new Error('Not implemented');
   }
 
-  private fireTrigger(session: PhpDebugSession, strategy: TriggerStrategy): Promise<TriggerResult> {
+  private fireTrigger(session: PhpDebugSession, strategy: TriggerStrategy, sessionLog: SessionLog): Promise<TriggerResult> {
+    const triggerName = strategy.constructor.name.replace('Strategy', '');
+    sessionLog.add(`Firing trigger: ${triggerName}`);
+
     if (strategy.acceptBeforeTrigger) {
       session.startAccepting();
       return strategy.execute();

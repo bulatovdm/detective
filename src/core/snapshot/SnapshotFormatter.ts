@@ -25,6 +25,10 @@ export function formatSnapshot(result: DebugSessionResult): string {
 
   parts.push(formatMeta(result.meta));
 
+  if (result.sessionLog) {
+    parts.push(formatSessionLog(result.sessionLog));
+  }
+
   return parts.join('\n\n---\n\n');
 }
 
@@ -150,4 +154,8 @@ function formatMeta(meta: DebugSessionResult['meta']): string {
     `  Hits: ${meta.totalHits}`,
     `  Time: ${meta.executionTimeMs}ms`,
   ].join('\n');
+}
+
+function formatSessionLog(log: string): string {
+  return `## Session Log\n\`\`\`\n${log}\n\`\`\``;
 }
