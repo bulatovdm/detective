@@ -23,18 +23,21 @@ export class DbgpConnection extends EventEmitter<DbgpConnectionEvents> {
   private accepting = false;
 
   async listen(host: string, port: number): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.server = createServer((socket) => this.handleConnection(socket));
-
-      this.server.on('error', (err) => {
-        reject(err);
-      });
-
-      this.server.listen(port, host, () => {
-        this.logger.info(`Listening on ${host}:${port}`);
-        resolve();
-      });
-    });
+    try {
+      await this.tryListen(host, port);
+    } catch (err) {
+      if (this.isAddressInUse(err)) {
+        this.logger.warn(`Port ${port} in use, retrying after cleanup`);
+        if (this.server) {
+          this.server.close();
+          this.server = null;
+        }
+        await this.delay(500);
+        await this.tryListen(host, port);
+      } else {
+        throw err;
+      }
+    }
   }
 
   startAccepting(): void {
@@ -109,6 +112,21 @@ export class DbgpConnection extends EventEmitter<DbgpConnectionEvents> {
     return this.socket !== null && !this.socket.destroyed;
   }
 
+  private async tryListen(host: string, port: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.server = createServer((socket) => this.handleConnection(socket));
+
+      this.server.on('error', (err) => {
+        reject(err);
+      });
+
+      this.server.listen(port, host, () => {
+        this.logger.info(`Listening on ${host}:${port}`);
+        resolve();
+      });
+    });
+  }
+
   private handleConnection(socket: Socket): void {
     if (!this.accepting) {
       socket.destroy();
@@ -180,5 +198,13 @@ export class DbgpConnection extends EventEmitter<DbgpConnectionEvents> {
       this.logger.error('Failed to parse XML', { xml, error: String(err) });
       this.emit('error', err instanceof Error ? err : new Error(String(err)));
     }
+  }
+
+  private isAddressInUse(err: unknown): boolean {
+    return (err as NodeJS.ErrnoException).code === 'EADDRINUSE';
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }

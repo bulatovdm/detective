@@ -21,6 +21,18 @@ async function main(): Promise<void> {
 
     const server = new DetectiveServer(config, projectRoot);
     await server.start();
+
+    let shuttingDown = false;
+    const shutdownGracefully = async () => {
+      if (shuttingDown) return;
+      shuttingDown = true;
+      logger.info('Received shutdown signal');
+      await server.shutdown();
+      process.exit(0);
+    };
+
+    process.on('SIGINT', shutdownGracefully);
+    process.on('SIGTERM', shutdownGracefully);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logger.error(`Failed to start: ${message}`);

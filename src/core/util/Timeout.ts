@@ -1,6 +1,7 @@
 export class TimeoutError extends Error {
-  constructor(timeoutMs: number) {
-    super(`Operation timed out after ${timeoutMs}ms`);
+  constructor(timeoutMs: number, stage?: string) {
+    const stageInfo = stage ? ` during: ${stage}` : '';
+    super(`Operation timed out after ${timeoutMs}ms${stageInfo}`);
     this.name = 'TimeoutError';
   }
 }

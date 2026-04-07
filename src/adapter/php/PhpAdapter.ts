@@ -10,7 +10,7 @@ import type {
   ProfileResult,
 } from '../../core/adapter/types.js';
 import { PathMapper } from '../../core/path/PathMapper.js';
-import { withTimeout } from '../../core/util/Timeout.js';
+import { withTimeout, TimeoutError } from '../../core/util/Timeout.js';
 import { Logger } from '../../core/util/Logger.js';
 import { PhpDebugSession } from './PhpDebugSession.js';
 import { TriggerStrategyFactory } from './trigger/TriggerStrategyFactory.js';
@@ -22,6 +22,7 @@ export class PhpAdapter implements LanguageAdapterInterface {
 
   private config: PhpAdapterFullConfig | null = null;
   private pathMapper: PathMapper | null = null;
+  private activeSession: PhpDebugSession | null = null;
   private readonly logger = new Logger('PhpAdapter');
   private readonly triggerFactory = new TriggerStrategyFactory();
 
@@ -37,6 +38,11 @@ export class PhpAdapter implements LanguageAdapterInterface {
   }
 
   async shutdown(): Promise<void> {
+    if (this.activeSession) {
+      this.logger.info('Closing active session on shutdown');
+      await this.activeSession.close().catch(() => {});
+      this.activeSession = null;
+    }
     this.logger.info('Shutting down');
   }
 
@@ -44,14 +50,23 @@ export class PhpAdapter implements LanguageAdapterInterface {
     const { config, pathMapper } = this.getInitialized();
     const timeoutMs = (params.timeout ?? config.defaults.timeout) * 1000;
 
+    if (this.activeSession) {
+      this.logger.warn('Previous session still active, force-closing');
+      await this.activeSession.close().catch(() => {});
+      this.activeSession = null;
+    }
+
     const session = new PhpDebugSession(
       pathMapper,
       config.php.xdebug.host,
       config.php.xdebug.port,
     );
+    this.activeSession = session;
 
     const abortController = new AbortController();
     const triggerStrategy = this.triggerFactory.create(params, config, abortController.signal);
+
+    let sessionStage = 'waiting for Xdebug connection';
 
     try {
       await session.listen();
@@ -66,11 +81,20 @@ export class PhpAdapter implements LanguageAdapterInterface {
         maxDataSize: config.defaults.maxDataSize,
       };
 
-      const debugPromise = session.waitForConnectionAndConfigure(timeoutMs, sessionOptions).then(() =>
-        session.runWithBreakpoints(sessionOptions),
-      );
+      const debugPromise = session.waitForConnectionAndConfigure(timeoutMs, sessionOptions).then(() => {
+        sessionStage = 'running with breakpoints';
+        return session.runWithBreakpoints(sessionOptions);
+      });
 
-      const debugResult = await withTimeout(debugPromise, timeoutMs);
+      let debugResult;
+      try {
+        debugResult = await withTimeout(debugPromise, timeoutMs);
+      } catch (err) {
+        if (err instanceof TimeoutError) {
+          throw new TimeoutError(timeoutMs, sessionStage);
+        }
+        throw err;
+      }
 
       await session.detach();
 
@@ -95,6 +119,7 @@ export class PhpAdapter implements LanguageAdapterInterface {
     } finally {
       abortController.abort();
       await session.close();
+      this.activeSession = null;
     }
   }
 

@@ -35,6 +35,12 @@ export class DetectiveServer {
     this.logger.info('Detective MCP server started');
   }
 
+  async shutdown(): Promise<void> {
+    this.logger.info('Shutting down');
+    const adapter = this.adapterRegistry.get(this.config.adapter);
+    await adapter.shutdown();
+  }
+
   private async initializeAdapters(): Promise<void> {
     const phpAdapter = new PhpAdapter();
     this.adapterRegistry.register(phpAdapter);
