@@ -138,8 +138,7 @@ export class PhpDebugSession {
       if (this.connection.isConnected) {
         await this.connection.sendCommand(this.commandBuilder.stop());
       }
-    } catch (err) {
-      this.logger.warn('Error during session close', err instanceof Error ? err.message : err);
+    } catch {
     } finally {
       await this.connection.close();
     }

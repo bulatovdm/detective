@@ -19,7 +19,10 @@ export class DbgpConnection extends EventEmitter<DbgpConnectionEvents> {
   private socket: Socket | null = null;
   private buffer = '';
   private readonly logger = new Logger('DbgpConnection');
-  private pendingResolves: Array<(response: DbgpResponse) => void> = [];
+  private pendingCallbacks: Array<{
+    resolve: (response: DbgpResponse) => void;
+    reject: (error: Error) => void;
+  }> = [];
   private accepting = false;
 
   async listen(host: string, port: number): Promise<void> {
@@ -80,12 +83,14 @@ export class DbgpConnection extends EventEmitter<DbgpConnectionEvents> {
     }
 
     return new Promise((resolve, reject) => {
-      this.pendingResolves.push(resolve);
+      const entry = { resolve, reject };
+      this.pendingCallbacks.push(entry);
 
       const data = `${command}\0`;
       this.socket!.write(data, (err) => {
         if (err) {
-          this.pendingResolves.pop();
+          const idx = this.pendingCallbacks.indexOf(entry);
+          if (idx !== -1) this.pendingCallbacks.splice(idx, 1);
           reject(err);
         }
       });
@@ -93,6 +98,8 @@ export class DbgpConnection extends EventEmitter<DbgpConnectionEvents> {
   }
 
   async close(): Promise<void> {
+    this.rejectPending(new Error('Connection closed'));
+
     if (this.socket) {
       this.socket.destroy();
       this.socket = null;
@@ -105,6 +112,13 @@ export class DbgpConnection extends EventEmitter<DbgpConnectionEvents> {
           resolve();
         });
       });
+    }
+  }
+
+  private rejectPending(error: Error): void {
+    const callbacks = this.pendingCallbacks.splice(0);
+    for (const cb of callbacks) {
+      cb.reject(error);
     }
   }
 
@@ -128,11 +142,12 @@ export class DbgpConnection extends EventEmitter<DbgpConnectionEvents> {
   }
 
   private handleConnection(socket: Socket): void {
-    if (!this.accepting) {
+    if (!this.accepting || this.socket) {
       socket.destroy();
       return;
     }
 
+    this.accepting = false;
     this.logger.info('Xdebug connected');
     this.socket = socket;
     this.buffer = '';
@@ -187,9 +202,9 @@ export class DbgpConnection extends EventEmitter<DbgpConnectionEvents> {
         this.emit('init', initPacket);
       } else {
         const response = parseResponse(xml);
-        const pending = this.pendingResolves.shift();
+        const pending = this.pendingCallbacks.shift();
         if (pending) {
-          pending(response);
+          pending.resolve(response);
         } else {
           this.emit('response', response);
         }
