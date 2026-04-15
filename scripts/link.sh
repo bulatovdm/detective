@@ -111,6 +111,13 @@ create_detective_json_from_preset() {
             content="${content//\{\{domain\}\}/$OPT_DOMAIN}"
             content="${content//\{\{user\}\}/$OPT_USER}"
             ;;
+        docker)
+            content="${content//\{\{app_url\}\}/$OPT_APP_URL}"
+            content="${content//\{\{container\}\}/$OPT_CONTAINER}"
+            content="${content//\{\{ide_key\}\}/$OPT_IDE_KEY}"
+            content="${content//\{\{container_path\}\}/$OPT_CONTAINER_PATH}"
+            content="${content//\{\{host_path\}\}/$PROJECT_DIR}"
+            ;;
         default)
             content="${content//\{\{app_url\}\}/$OPT_APP_URL}"
             ;;
@@ -301,6 +308,9 @@ parse_flags() {
     OPT_USER=""
     OPT_LANG=""
     OPT_APP_URL=""
+    OPT_CONTAINER=""
+    OPT_IDE_KEY=""
+    OPT_CONTAINER_PATH=""
     OPT_PROJECT=""
 
     while [[ $# -gt 0 ]]; do
@@ -310,6 +320,9 @@ parse_flags() {
             --user)    OPT_USER="$2"; shift 2 ;;
             --lang)    OPT_LANG="$2"; shift 2 ;;
             --url)     OPT_APP_URL="$2"; shift 2 ;;
+            --container) OPT_CONTAINER="$2"; shift 2 ;;
+            --ide-key) OPT_IDE_KEY="$2"; shift 2 ;;
+            --container-path) OPT_CONTAINER_PATH="$2"; shift 2 ;;
             -*)        echo "Unknown flag: $1"; exit 1 ;;
             *)
                 if [[ -z "$OPT_PROJECT" ]]; then
@@ -329,10 +342,12 @@ prompt_preset() {
     echo ""
     echo "Choose preset:"
     echo "  1) SELF Framework"
-    echo "  2) Default (basic PHP/Xdebug)"
-    read -rp "Preset [2]: " choice
+    echo "  2) Docker"
+    echo "  3) Default (basic PHP/Xdebug)"
+    read -rp "Preset [3]: " choice
     case "$choice" in
         1) OPT_PRESET="self" ;;
+        2) OPT_PRESET="docker" ;;
         *) OPT_PRESET="default" ;;
     esac
 }
@@ -356,6 +371,31 @@ prompt_default_options() {
     if [[ -z "$OPT_APP_URL" ]]; then
         read -rp "App URL [http://localhost:8000]: " OPT_APP_URL
         OPT_APP_URL="${OPT_APP_URL:-http://localhost:8000}"
+    fi
+}
+
+prompt_docker_options() {
+    if [[ -z "$OPT_APP_URL" ]]; then
+        read -rp "App URL [https://localhost]: " OPT_APP_URL
+        OPT_APP_URL="${OPT_APP_URL:-https://localhost}"
+    fi
+
+    if [[ -z "$OPT_CONTAINER" ]]; then
+        read -rp "Docker container name: " OPT_CONTAINER
+        if [[ -z "$OPT_CONTAINER" ]]; then
+            echo "Error: container name is required for Docker preset"
+            exit 1
+        fi
+    fi
+
+    if [[ -z "$OPT_IDE_KEY" ]]; then
+        read -rp "Xdebug ideKey [VSCODE]: " OPT_IDE_KEY
+        OPT_IDE_KEY="${OPT_IDE_KEY:-VSCODE}"
+    fi
+
+    if [[ -z "$OPT_CONTAINER_PATH" ]]; then
+        read -rp "Project path inside container [/var/www/app]: " OPT_CONTAINER_PATH
+        OPT_CONTAINER_PATH="${OPT_CONTAINER_PATH:-/var/www/app}"
     fi
 }
 
@@ -402,6 +442,7 @@ case "$COMMAND" in
 
         case "$OPT_PRESET" in
             self)    prompt_self_options ;;
+            docker)  prompt_docker_options ;;
             default) prompt_default_options ;;
         esac
 
@@ -463,16 +504,20 @@ case "$COMMAND" in
         echo "  status [path]          - Check Detective configuration"
         echo ""
         echo "Flags (for link):"
-        echo "  --preset self|default  - Environment preset"
-        echo "  --domain <name>        - Site domain (SELF preset)"
-        echo "  --user <name>          - OrbStack user (SELF preset)"
-        echo "  --url <url>            - App URL (default preset)"
-        echo "  --lang ru|en           - CLAUDE.md language"
+        echo "  --preset self|docker|default  - Environment preset"
+        echo "  --domain <name>               - Site domain (SELF preset)"
+        echo "  --user <name>                 - OrbStack user (SELF preset)"
+        echo "  --url <url>                   - App URL (default/docker preset)"
+        echo "  --container <name>            - Docker container name (docker preset)"
+        echo "  --ide-key <key>               - Xdebug ideKey (docker preset)"
+        echo "  --container-path <path>       - Project path inside container (docker preset)"
+        echo "  --lang ru|en                  - CLAUDE.md language"
         echo ""
         echo "If path is omitted, current directory is used."
         echo ""
         echo "Examples:"
         echo "  $0 link ~/projects/myapp --preset self --domain multimedica --lang ru"
+        echo "  $0 link ~/projects/myapp --preset docker --url https://app.local --container app-php"
         echo "  $0 link ~/projects/myapp --preset default --url http://localhost:8000"
         echo "  $0 link                  # interactive mode in current directory"
         echo "  $0 update ~/projects/myapp"

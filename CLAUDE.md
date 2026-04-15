@@ -65,7 +65,7 @@ LLM → MCP (stdio) → DetectiveServer → PhpAdapter → DbgpConnection → Xd
 
 ```bash
 ./scripts/setup.sh install                          # симлинк 'detective' в ~/.local/bin
-detective link [path] [--preset self|default] [--lang ru|en]  # интерактивная линковка
+detective link [path] [--preset self|docker|default] [--lang ru|en]  # интерактивная линковка
 detective update [path] [--lang ru|en]               # обновить секцию в CLAUDE.md
 detective status [path]                              # проверить конфигурацию
 detective unlink [path]                              # отключить от проекта
@@ -75,9 +75,10 @@ detective unlink [path]                              # отключить от �
 
 ### Пресеты
 
-`presets/` — шаблоны конфигов и CLAUDE.md секций. Пресеты: `self` (SELF Framework + OrbStack), `default` (базовый PHP/Xdebug).
+`presets/` — шаблоны конфигов и CLAUDE.md секций. Пресеты: `self` (SELF Framework + OrbStack), `docker` (Docker-контейнеры), `default` (базовый PHP/Xdebug).
 
 - `presets/self/detective.json.tpl` — шаблон detective.json для SELF (плейсхолдеры `{{domain}}`, `{{user}}`)
+- `presets/docker/detective.json.tpl` — шаблон detective.json для Docker (плейсхолдеры `{{app_url}}`, `{{container}}`, `{{ide_key}}`, `{{container_path}}`, `{{host_path}}`)
 - `presets/default/detective.json.tpl` — шаблон detective.json по умолчанию (плейсхолдер `{{app_url}}`)
 - `presets/claude-md/ru.md`, `presets/claude-md/en.md` — шаблоны секции для CLAUDE.md
 
