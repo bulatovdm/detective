@@ -12,6 +12,15 @@ async function main(): Promise<void> {
   const configPath = configArg ? resolve(configArg) : undefined;
   const projectRoot = configPath ? dirname(configPath) : process.cwd();
 
+  logger.info('Starting Detective', {
+    pid: process.pid,
+    cwd: process.cwd(),
+    configPath: configPath ?? '(default)',
+    projectRoot,
+    logFile: process.env['DETECTIVE_LOG_FILE'] ?? '(stderr only)',
+    logLevel: process.env['DETECTIVE_LOG_LEVEL'] ?? 'info',
+  });
+
   try {
     const config = await loadConfig(configPath);
 

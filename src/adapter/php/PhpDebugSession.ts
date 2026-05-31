@@ -63,9 +63,12 @@ export class PhpDebugSession {
   }
 
   async waitForConnectionAndConfigure(timeoutMs: number, options: DebugSessionOptions): Promise<void> {
+    this.logger.debug(`Waiting for Xdebug connection (timeout=${timeoutMs}ms)`);
     this.initPacket = await this.connection.waitForConnection(timeoutMs);
+    this.logger.info(`Xdebug init received (engine=${this.initPacket.engineVersion}, language=${this.initPacket.language})`);
     this.sessionLog.add('Xdebug connected');
     await this.configureFeatures(options);
+    this.logger.debug('Features configured');
     this.sessionLog.add('Session configured');
   }
 
@@ -85,8 +88,10 @@ export class PhpDebugSession {
       let hitNumber = 0;
 
       this.sessionLog.add('Running to breakpoints');
+      this.logger.debug(`Run loop start (maxRuns=${maxRuns}, strategies=${strategies.length})`);
 
       while (consumingHits < maxRuns && nonConsumingHits < MAX_NON_CONSUMING_HITS) {
+        this.logger.debug(`Run iteration (consuming=${consumingHits}/${maxRuns}, nonConsuming=${nonConsumingHits})`);
         const runResponse = await this.connection.sendCommand(this.commandBuilder.run());
 
         if (runResponse.status !== DBGP_STATUS.BREAK) {
@@ -124,6 +129,7 @@ export class PhpDebugSession {
   }
 
   async detach(): Promise<void> {
+    this.logger.debug(`detach() called (connected=${this.connection.isConnected})`);
     try {
       if (this.connection.isConnected) {
         await this.connection.sendCommand(this.commandBuilder.detach());
@@ -134,13 +140,16 @@ export class PhpDebugSession {
   }
 
   async close(): Promise<void> {
+    this.logger.debug(`close() called (connected=${this.connection.isConnected})`);
     try {
       if (this.connection.isConnected) {
         await this.connection.sendCommand(this.commandBuilder.stop());
       }
-    } catch {
+    } catch (err) {
+      this.logger.debug(`stop command failed during close: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       await this.connection.close();
+      this.logger.debug('Session closed');
     }
   }
 

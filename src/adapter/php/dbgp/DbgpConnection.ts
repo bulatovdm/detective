@@ -82,13 +82,22 @@ export class DbgpConnection extends EventEmitter<DbgpConnectionEvents> {
       throw new Error('No active DBGp connection');
     }
 
+    this.logger.debug(`→ ${command}`);
+
     return new Promise((resolve, reject) => {
-      const entry = { resolve, reject };
+      const entry = {
+        resolve: (response: DbgpResponse) => {
+          this.logger.debug(`← ${command} (status=${response.status ?? '?'})`);
+          resolve(response);
+        },
+        reject,
+      };
       this.pendingCallbacks.push(entry);
 
       const data = `${command}\0`;
       this.socket!.write(data, (err) => {
         if (err) {
+          this.logger.warn(`socket write failed: ${err.message}`);
           const idx = this.pendingCallbacks.indexOf(entry);
           if (idx !== -1) this.pendingCallbacks.splice(idx, 1);
           reject(err);
@@ -98,6 +107,7 @@ export class DbgpConnection extends EventEmitter<DbgpConnectionEvents> {
   }
 
   async close(): Promise<void> {
+    this.logger.debug(`Closing connection (pendingCallbacks=${this.pendingCallbacks.length}, hasSocket=${this.socket !== null}, hasServer=${this.server !== null})`);
     this.rejectPending(new Error('Connection closed'));
 
     if (this.socket) {
@@ -108,6 +118,7 @@ export class DbgpConnection extends EventEmitter<DbgpConnectionEvents> {
     if (this.server) {
       return new Promise((resolve) => {
         this.server!.close(() => {
+          this.logger.debug('TCP server closed');
           this.server = null;
           resolve();
         });
@@ -142,19 +153,26 @@ export class DbgpConnection extends EventEmitter<DbgpConnectionEvents> {
   }
 
   private handleConnection(socket: Socket): void {
+    const remote = `${socket.remoteAddress ?? '?'}:${socket.remotePort ?? '?'}`;
+
     if (!this.accepting || this.socket) {
+      this.logger.debug(`Rejecting inbound connection from ${remote} (accepting=${this.accepting}, hasSocket=${this.socket !== null})`);
       socket.destroy();
       return;
     }
 
     this.accepting = false;
-    this.logger.info('Xdebug connected');
+    this.logger.info(`Xdebug connected from ${remote}`);
     this.socket = socket;
     this.buffer = '';
 
     socket.on('data', (data) => this.handleData(data));
-    socket.on('error', (err) => this.emit('error', err));
+    socket.on('error', (err) => {
+      this.logger.warn(`socket error: ${err.message}`);
+      this.emit('error', err);
+    });
     socket.on('close', () => {
+      this.logger.debug(`socket closed (remote=${remote})`);
       this.socket = null;
       this.emit('close');
     });

@@ -53,6 +53,8 @@ export class PhpAdapter implements LanguageAdapterInterface {
     const sessionLog = new SessionLog();
     const includeLog = params.verbose ?? false;
 
+    this.logger.debug(`executeDebugSession start (timeoutMs=${timeoutMs}, breakpoints=${params.breakpoints.length}, verbose=${includeLog})`);
+
     if (this.activeSession) {
       this.logger.warn('Previous session still active, force-closing');
       sessionLog.add('Force-closing previous active session');
@@ -134,9 +136,11 @@ export class PhpAdapter implements LanguageAdapterInterface {
         sessionLog: includeLog ? sessionLog.format() : undefined,
       };
     } finally {
+      this.logger.debug('executeDebugSession finally: aborting trigger and closing session');
       abortController.abort();
       await session.close();
       this.activeSession = null;
+      this.logger.debug('executeDebugSession done');
     }
   }
 
