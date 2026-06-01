@@ -123,12 +123,15 @@ function formatVariable(name: string, variable: VariableValue, depth: number): s
     return lines.join('\n');
   }
 
-  const valueStr = formatScalarValue(variable.value);
+  const valueStr = formatScalarValue(variable.value, variable.type);
   return `${indent}${name}: (${typeLabel}) ${valueStr}${truncatedMark}`;
 }
 
-function formatScalarValue(value: unknown): string {
-  if (value === null) return 'null';
+function formatScalarValue(value: unknown, type?: string): string {
+  if (value === null) {
+    if (type === 'bool') return '(value not available)';
+    return 'null';
+  }
   if (typeof value === 'string') {
     if (value.length > 200) return `"${value.slice(0, 200)}..."`;
     return `"${value}"`;

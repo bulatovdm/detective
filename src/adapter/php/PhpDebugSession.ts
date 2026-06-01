@@ -256,8 +256,13 @@ export class PhpDebugSession {
         return prop.value !== undefined ? parseInt(prop.value, 10) : null;
       case 'float':
         return prop.value !== undefined ? parseFloat(prop.value) : null;
-      case 'bool':
-        return prop.value === '1' || prop.value === 'true';
+      case 'bool': {
+        if (prop.value === undefined) {
+          return null;
+        }
+        const normalized = String(prop.value);
+        return normalized === '1' || normalized === 'true';
+      }
       case 'null':
         return null;
       case 'string':

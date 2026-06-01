@@ -14,6 +14,8 @@ const xmlParser = new XMLParser({
   isArray: (name) => name === 'stack' || name === 'property',
   htmlEntities: true,
   processEntities: false,
+  parseTagValue: false,
+  parseAttributeValue: false,
 });
 
 export function parseInitPacket(xml: string): DbgpInitPacket {
