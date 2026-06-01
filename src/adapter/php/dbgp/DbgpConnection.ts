@@ -172,8 +172,9 @@ export class DbgpConnection extends EventEmitter<DbgpConnectionEvents> {
       this.emit('error', err);
     });
     socket.on('close', () => {
-      this.logger.debug(`socket closed (remote=${remote})`);
+      this.logger.debug(`socket closed (remote=${remote}, pendingCallbacks=${this.pendingCallbacks.length})`);
       this.socket = null;
+      this.rejectPending(new Error('Socket closed before response'));
       this.emit('close');
     });
   }
