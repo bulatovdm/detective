@@ -118,6 +118,11 @@ create_detective_json_from_preset() {
             content="${content//\{\{container_path\}\}/$OPT_CONTAINER_PATH}"
             content="${content//\{\{host_path\}\}/$PROJECT_DIR}"
             ;;
+        whyme-docker)
+            content="${content//\{\{app_url\}\}/$OPT_APP_URL}"
+            content="${content//\{\{container\}\}/$OPT_CONTAINER}"
+            content="${content//\{\{host_path\}\}/$PROJECT_DIR}"
+            ;;
         default)
             content="${content//\{\{app_url\}\}/$OPT_APP_URL}"
             ;;
@@ -343,11 +348,13 @@ prompt_preset() {
     echo "Choose preset:"
     echo "  1) SELF Framework"
     echo "  2) Docker"
-    echo "  3) Default (basic PHP/Xdebug)"
-    read -rp "Preset [3]: " choice
+    echo "  3) WhyMe Docker (webdevops, /app workdir, mkcert TLS)"
+    echo "  4) Default (basic PHP/Xdebug)"
+    read -rp "Preset [4]: " choice
     case "$choice" in
         1) OPT_PRESET="self" ;;
         2) OPT_PRESET="docker" ;;
+        3) OPT_PRESET="whyme-docker" ;;
         *) OPT_PRESET="default" ;;
     esac
 }
@@ -371,6 +378,24 @@ prompt_default_options() {
     if [[ -z "$OPT_APP_URL" ]]; then
         read -rp "App URL [http://localhost:8000]: " OPT_APP_URL
         OPT_APP_URL="${OPT_APP_URL:-http://localhost:8000}"
+    fi
+}
+
+prompt_whyme_docker_options() {
+    if [[ -z "$OPT_APP_URL" ]]; then
+        read -rp "App URL (e.g. https://myapp.local): " OPT_APP_URL
+        if [[ -z "$OPT_APP_URL" ]]; then
+            echo "Error: app URL is required for whyme-docker preset"
+            exit 1
+        fi
+    fi
+
+    if [[ -z "$OPT_CONTAINER" ]]; then
+        read -rp "Docker container name (e.g. myapp_web): " OPT_CONTAINER
+        if [[ -z "$OPT_CONTAINER" ]]; then
+            echo "Error: container name is required for whyme-docker preset"
+            exit 1
+        fi
     fi
 }
 
@@ -441,9 +466,10 @@ case "$COMMAND" in
         prompt_preset
 
         case "$OPT_PRESET" in
-            self)    prompt_self_options ;;
-            docker)  prompt_docker_options ;;
-            default) prompt_default_options ;;
+            self)         prompt_self_options ;;
+            docker)       prompt_docker_options ;;
+            whyme-docker) prompt_whyme_docker_options ;;
+            default)      prompt_default_options ;;
         esac
 
         prompt_lang
@@ -504,7 +530,7 @@ case "$COMMAND" in
         echo "  status [path]          - Check Detective configuration"
         echo ""
         echo "Flags (for link):"
-        echo "  --preset self|docker|default  - Environment preset"
+        echo "  --preset self|docker|whyme-docker|default - Environment preset"
         echo "  --domain <name>               - Site domain (SELF preset)"
         echo "  --user <name>                 - OrbStack user (SELF preset)"
         echo "  --url <url>                   - App URL (default/docker preset)"
@@ -518,6 +544,7 @@ case "$COMMAND" in
         echo "Examples:"
         echo "  $0 link ~/projects/myapp --preset self --domain multimedica --lang ru"
         echo "  $0 link ~/projects/myapp --preset docker --url https://app.local --container app-php"
+        echo "  $0 link ~/projects/myapp --preset whyme-docker --url https://myapp.local --container myapp_web"
         echo "  $0 link ~/projects/myapp --preset default --url http://localhost:8000"
         echo "  $0 link                  # interactive mode in current directory"
         echo "  $0 update ~/projects/myapp"
