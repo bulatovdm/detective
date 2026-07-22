@@ -8,7 +8,7 @@ export function executeCliCommand(
   timeoutMs?: number,
 ): Promise<CommandOutput> {
   const envPrefix = env
-    ? Object.entries(env).map(([k, v]) => `${k}='${v}'`).join(' ') + ' '
+    ? 'env ' + Object.entries(env).map(([k, v]) => `${k}='${v}'`).join(' ') + ' '
     : '';
   const commandWithEnv = `${envPrefix}${command}`;
   const fullCommand = execTemplate.replace('{command}', commandWithEnv);
