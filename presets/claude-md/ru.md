@@ -58,6 +58,16 @@ Detective сам залогинится, закеширует куку и под
 }
 ```
 
+Если механизмов два сразу (например, nginx basic auth поверх сессии) — `auth` принимает массив,
+заголовки складываются:
+
+```jsonc
+{ "auth": [
+  { "type": "header", "header": "Authorization", "valueEnv": "BASIC_AUTH" },
+  { "type": "form", "url": "/api/login", "credentials": { "...": "..." }, "cookieNames": ["session"] }
+] }
+```
+
 **Куки не конфликтуют**: `XDEBUG_SESSION` и сессия приложения отправляются вместе.
 Можно передать куку и разово — `headers: {"Cookie": "session=..."}` в вызове инструмента;
 она будет слита с `XDEBUG_SESSION`, а не заменит её.

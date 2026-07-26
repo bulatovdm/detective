@@ -43,7 +43,9 @@ export interface HeaderAuthConfig {
   valueEnv?: string;
 }
 
-export type AuthConfig = FormAuthConfig | HeaderAuthConfig;
+export type AuthenticatorConfig = FormAuthConfig | HeaderAuthConfig;
+
+export type AuthConfig = AuthenticatorConfig | AuthenticatorConfig[];
 
 export interface DetectiveConfig {
   adapter: string;

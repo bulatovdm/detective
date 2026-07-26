@@ -123,3 +123,27 @@ describe('mergeConfigLayers', () => {
     expect(merged).toEqual({ app: { url: 'http://localhost:8000' } });
   });
 });
+
+describe('ConfigLoader auth list', () => {
+  it('accepts a list of authenticators', () => {
+    const config = parseConfig({
+      app: { url: 'http://localhost:8000' },
+      auth: [
+        { type: 'header', header: 'Authorization', valueEnv: 'BASIC_AUTH' },
+        { type: 'form', url: '/api/login', credentials: { login: 'u', password: 'p' } },
+      ],
+    });
+
+    expect(Array.isArray(config.auth)).toBe(true);
+    expect(config.auth).toHaveLength(2);
+  });
+
+  it('still accepts a single authenticator object', () => {
+    const config = parseConfig({
+      app: { url: 'http://localhost:8000' },
+      auth: { type: 'header', header: 'X-Auth-Token', value: 'k' },
+    });
+
+    expect(Array.isArray(config.auth)).toBe(false);
+  });
+});

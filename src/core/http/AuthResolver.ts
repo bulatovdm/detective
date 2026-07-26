@@ -1,4 +1,10 @@
-import type { AuthConfig, FormAuthConfig, HeaderAuthConfig } from '../config/Config.js';
+import type {
+  AuthConfig,
+  AuthenticatorConfig,
+  FormAuthConfig,
+  HeaderAuthConfig,
+} from '../config/Config.js';
+import { mergeHeaders } from './RequestBuilder.js';
 
 export interface AuthFetch {
   (url: string, init: { method: string; headers: Record<string, string>; body?: string }): Promise<{
@@ -8,7 +14,7 @@ export interface AuthFetch {
 }
 
 export class AuthResolver {
-  private cachedCookie?: string;
+  private readonly cachedCookies = new Map<string, string>();
 
   constructor(
     private readonly config: AuthConfig | undefined,
@@ -18,19 +24,30 @@ export class AuthResolver {
   ) {}
 
   async headers(): Promise<Record<string, string>> {
-    if (this.config === undefined) {
-      return {};
+    let headers: Record<string, string> = {};
+
+    for (const authenticator of this.authenticators()) {
+      headers = mergeHeaders(
+        headers,
+        authenticator.type === 'header'
+          ? this.headerAuth(authenticator)
+          : await this.formAuth(authenticator),
+      );
     }
 
-    if (this.config.type === 'header') {
-      return this.headerAuth(this.config);
-    }
-
-    return this.formAuth(this.config);
+    return headers;
   }
 
   invalidate(): void {
-    this.cachedCookie = undefined;
+    this.cachedCookies.clear();
+  }
+
+  private authenticators(): AuthenticatorConfig[] {
+    if (this.config === undefined) {
+      return [];
+    }
+
+    return Array.isArray(this.config) ? this.config : [this.config];
   }
 
   private headerAuth(config: HeaderAuthConfig): Record<string, string> {
@@ -49,8 +66,10 @@ export class AuthResolver {
   }
 
   private async formAuth(config: FormAuthConfig): Promise<Record<string, string>> {
-    if (this.cachedCookie !== undefined) {
-      return { Cookie: this.cachedCookie };
+    const cached = this.cachedCookies.get(config.url);
+
+    if (cached !== undefined) {
+      return { Cookie: cached };
     }
 
     const response = await this.fetchImpl(new URL(config.url, this.appUrl).toString(), {
@@ -77,7 +96,7 @@ export class AuthResolver {
       );
     }
 
-    this.cachedCookie = cookie;
+    this.cachedCookies.set(config.url, cookie);
 
     return { Cookie: cookie };
   }

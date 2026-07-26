@@ -105,3 +105,60 @@ describe('AuthResolver', () => {
     await expect(resolver.headers()).rejects.toThrow(/TOKEN/);
   });
 });
+
+describe('AuthResolver with several authenticators', () => {
+  it('combines headers from every authenticator', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      loginResponse(['session=abc123']),
+    ) as unknown as AuthFetch;
+
+    const resolver = new AuthResolver(
+      [
+        { type: 'header', header: 'Authorization', value: 'Basic Zm9v' },
+        formConfig,
+      ],
+      'http://app.test',
+      fetchImpl,
+    );
+
+    expect(await resolver.headers()).toEqual({
+      Authorization: 'Basic Zm9v',
+      Cookie: 'session=abc123',
+    });
+  });
+
+  it('merges cookies from two cookie-based authenticators', async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(loginResponse(['first=1']))
+      .mockResolvedValueOnce(loginResponse(['second=2'])) as unknown as AuthFetch;
+
+    const resolver = new AuthResolver(
+      [
+        { ...formConfig, url: '/login/a', cookieNames: ['first'] },
+        { ...formConfig, url: '/login/b', cookieNames: ['second'] },
+      ],
+      'http://app.test',
+      fetchImpl,
+    );
+
+    const headers = await resolver.headers();
+
+    expect(headers.Cookie).toContain('first=1');
+    expect(headers.Cookie).toContain('second=2');
+  });
+
+  it('caches each form login independently', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(loginResponse(['session=abc']));
+
+    const resolver = new AuthResolver(
+      [formConfig, { ...formConfig, url: '/login/b' }],
+      'http://app.test',
+      fetchImpl as unknown as AuthFetch,
+    );
+
+    await resolver.headers();
+    await resolver.headers();
+
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+});

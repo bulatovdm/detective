@@ -65,6 +65,17 @@ create_local_config() {
       "header": "X-Auth-Token",
       "valueEnv": "DETECTIVE_TOKEN"
     }
+  },
+  "_severalAuthenticatorsExample": {
+    "auth": [
+      { "type": "header", "header": "Authorization", "valueEnv": "BASIC_AUTH" },
+      {
+        "type": "form",
+        "url": "/api/login",
+        "credentials": { "login": "CHANGE_ME", "password": "CHANGE_ME" },
+        "cookieNames": ["session"]
+      }
+    ]
   }
 }
 EOF

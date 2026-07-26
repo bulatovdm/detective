@@ -58,6 +58,16 @@ For an API key instead of a login form:
 }
 ```
 
+When two mechanisms apply at once (nginx basic auth on top of the app session, for example),
+`auth` also accepts an array and the headers are combined:
+
+```jsonc
+{ "auth": [
+  { "type": "header", "header": "Authorization", "valueEnv": "BASIC_AUTH" },
+  { "type": "form", "url": "/api/login", "credentials": { "...": "..." }, "cookieNames": ["session"] }
+] }
+```
+
 **Cookies do not clash**: `XDEBUG_SESSION` and the application session are sent together.
 A cookie can also be passed per call — `headers: {"Cookie": "session=..."}` — and it is merged
 with `XDEBUG_SESSION` rather than replacing it.

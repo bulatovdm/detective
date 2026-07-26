@@ -37,9 +37,14 @@ const headerAuthSchema = z.object({
   valueEnv: z.string().optional(),
 });
 
-const authSchema = z.discriminatedUnion('type', [
+const authenticatorSchema = z.discriminatedUnion('type', [
   formAuthSchema,
   headerAuthSchema,
+]);
+
+const authSchema = z.union([
+  authenticatorSchema,
+  z.array(authenticatorSchema),
 ]);
 
 const defaultsSchema = z.object({
