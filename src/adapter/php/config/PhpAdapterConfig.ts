@@ -1,4 +1,4 @@
-import type { DetectiveConfig, PhpConfig, DefaultsConfig } from '../../../core/config/Config.js';
+import type { DetectiveConfig, PhpConfig, DefaultsConfig, AuthConfig } from '../../../core/config/Config.js';
 
 export interface PhpAdapterFullConfig {
   php: PhpConfig;
@@ -7,6 +7,7 @@ export interface PhpAdapterFullConfig {
   pathMapping: Record<string, string>;
   defaults: DefaultsConfig;
   projectRoot: string;
+  auth?: AuthConfig;
 }
 
 export function extractPhpConfig(config: DetectiveConfig, projectRoot: string): PhpAdapterFullConfig {
@@ -17,5 +18,6 @@ export function extractPhpConfig(config: DetectiveConfig, projectRoot: string): 
     pathMapping: config.pathMapping,
     defaults: config.defaults,
     projectRoot,
+    auth: config.auth,
   };
 }

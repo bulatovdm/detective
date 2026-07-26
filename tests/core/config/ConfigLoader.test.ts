@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseConfig } from '../../../src/core/config/ConfigLoader.js';
+import { parseConfig, mergeConfigLayers } from '../../../src/core/config/ConfigLoader.js';
 
 describe('ConfigLoader', () => {
   it('parses minimal config with defaults', () => {
@@ -53,5 +53,73 @@ describe('ConfigLoader', () => {
 
   it('throws on invalid config', () => {
     expect(() => parseConfig({} as never)).toThrow();
+  });
+});
+
+describe('ConfigLoader auth', () => {
+  it('accepts a form auth section', () => {
+    const config = parseConfig({
+      app: { url: 'http://localhost:8000' },
+      auth: {
+        type: 'form',
+        url: '/api/login',
+        credentials: { login: 'user', password: 'secret' },
+        cookieNames: ['session'],
+      },
+    });
+
+    expect(config.auth?.type).toBe('form');
+  });
+
+  it('accepts a header auth section', () => {
+    const config = parseConfig({
+      app: { url: 'http://localhost:8000' },
+      auth: {
+        type: 'header',
+        header: 'X-Auth-Token',
+        valueEnv: 'DETECTIVE_TOKEN',
+      },
+    });
+
+    expect(config.auth?.type).toBe('header');
+  });
+
+  it('leaves auth undefined when the section is absent', () => {
+    const config = parseConfig({
+      app: { url: 'http://localhost:8000' },
+    });
+
+    expect(config.auth).toBeUndefined();
+  });
+});
+
+describe('mergeConfigLayers', () => {
+  it('overlays local values onto the base config', () => {
+    const merged = mergeConfigLayers(
+      { app: { url: 'http://localhost:8000' }, php: { binary: 'php' } },
+      { auth: { type: 'form', url: '/api/login', credentials: { login: 'u', password: 'p' } } },
+    );
+
+    expect(merged).toMatchObject({
+      app: { url: 'http://localhost:8000' },
+      php: { binary: 'php' },
+      auth: { type: 'form' },
+    });
+  });
+
+  it('merges nested objects instead of replacing them wholesale', () => {
+    const merged = mergeConfigLayers(
+      { app: { url: 'http://localhost:8000', basePath: '/srv' } },
+      { app: { url: 'https://app.local' } },
+    ) as { app: Record<string, unknown> };
+
+    expect(merged.app.url).toBe('https://app.local');
+    expect(merged.app.basePath).toBe('/srv');
+  });
+
+  it('returns the base config when there is no local layer', () => {
+    const merged = mergeConfigLayers({ app: { url: 'http://localhost:8000' } }, undefined);
+
+    expect(merged).toEqual({ app: { url: 'http://localhost:8000' } });
   });
 });

@@ -84,7 +84,7 @@ describe('buildRequest', () => {
     );
 
     expect(cookieKeys).toHaveLength(1);
-    expect(result.headers[cookieKeys[0]!]).toBe('session=abc');
+    expect(result.headers[cookieKeys[0]!]).toBe('XDEBUG_SESSION=IDE; session=abc');
   });
 
   it('preserves the caller-supplied Content-Type value when an object body is given', () => {
@@ -106,5 +106,59 @@ describe('buildRequest', () => {
 
     expect(headerKeys).toHaveLength(1);
     expect(result.headers[headerKeys[0]!]).toBe('application/vnd.api+json');
+  });
+});
+
+describe('buildRequest cookies', () => {
+  it('merges the caller cookies with XDEBUG_SESSION instead of replacing it', () => {
+    const result = buildRequest(
+      {
+        type: 'http',
+        url: '/admin/list',
+        method: 'GET',
+        headers: { 'Cookie': 'session=abc123' },
+      },
+      'http://app.test',
+      'IDE',
+    );
+
+    expect(result.headers['Cookie']).toContain('XDEBUG_SESSION=IDE');
+    expect(result.headers['Cookie']).toContain('session=abc123');
+  });
+
+  it('merges cookies regardless of the header case used by the caller', () => {
+    const result = buildRequest(
+      {
+        type: 'http',
+        url: '/admin/list',
+        method: 'GET',
+        headers: { 'cookie': 'session=abc123' },
+      },
+      'http://app.test',
+      'IDE',
+    );
+
+    const cookie = result.headers['Cookie'] ?? result.headers['cookie'];
+
+    expect(cookie).toContain('XDEBUG_SESSION=IDE');
+    expect(cookie).toContain('session=abc123');
+  });
+
+  it('lets the caller override XDEBUG_SESSION explicitly', () => {
+    const result = buildRequest(
+      {
+        type: 'http',
+        url: '/admin/list',
+        method: 'GET',
+        headers: { 'Cookie': 'XDEBUG_SESSION=CUSTOM; session=abc' },
+      },
+      'http://app.test',
+      'IDE',
+    );
+
+    const cookie = result.headers['Cookie'];
+
+    expect(cookie).toContain('XDEBUG_SESSION=CUSTOM');
+    expect(cookie).not.toContain('XDEBUG_SESSION=IDE');
   });
 });

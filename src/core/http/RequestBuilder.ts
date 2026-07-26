@@ -15,7 +15,7 @@ export function buildRequest(
   const url = new URL(trigger.url, appUrl);
   url.searchParams.set('XDEBUG_SESSION_START', ideKey);
 
-  const headers = mergeHeadersCaseInsensitive(
+  const headers = mergeHeaders(
     { 'Cookie': `XDEBUG_SESSION=${ideKey}` },
     trigger.headers,
   );
@@ -38,6 +38,59 @@ export function buildRequest(
     headers,
     body,
   };
+}
+
+export function mergeHeaders(
+  base: Record<string, string>,
+  extra: Record<string, string> | undefined,
+): Record<string, string> {
+  const headers = mergeHeadersCaseInsensitive(base, extra);
+
+  const baseCookieKey = findHeaderKeyCaseInsensitive(base, 'Cookie');
+  const extraCookieKey = findHeaderKeyCaseInsensitive(extra ?? {}, 'Cookie');
+
+  if (baseCookieKey === undefined || extraCookieKey === undefined) {
+    return headers;
+  }
+
+  const cookieKey = findHeaderKeyCaseInsensitive(headers, 'Cookie') as string;
+
+  headers[cookieKey] = mergeCookies(
+    base[baseCookieKey] as string,
+    (extra as Record<string, string>)[extraCookieKey],
+  );
+
+  return headers;
+}
+
+function mergeCookies(base: string, extra: string | undefined): string {
+  if (extra === undefined || extra.trim() === '') {
+    return base;
+  }
+
+  const names = new Set(
+    parseCookieNames(extra),
+  );
+
+  const kept = base
+    .split(';')
+    .map((pair) => pair.trim())
+    .filter((pair) => pair !== '' && !names.has(cookieName(pair)));
+
+  return [...kept, extra.trim()].join('; ');
+}
+
+function parseCookieNames(cookie: string): string[] {
+  return cookie
+    .split(';')
+    .map((pair) => cookieName(pair.trim()))
+    .filter((name) => name !== '');
+}
+
+function cookieName(pair: string): string {
+  const separator = pair.indexOf('=');
+
+  return (separator === -1 ? pair : pair.slice(0, separator)).trim();
 }
 
 function mergeHeadersCaseInsensitive(

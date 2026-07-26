@@ -28,9 +28,27 @@ export interface DefaultsConfig {
   maxResponseBodyLength: number;
 }
 
+export interface FormAuthConfig {
+  type: 'form';
+  url: string;
+  method: string;
+  credentials: Record<string, string>;
+  cookieNames: string[];
+}
+
+export interface HeaderAuthConfig {
+  type: 'header';
+  header: string;
+  value?: string;
+  valueEnv?: string;
+}
+
+export type AuthConfig = FormAuthConfig | HeaderAuthConfig;
+
 export interface DetectiveConfig {
   adapter: string;
   app: AppConfig;
+  auth?: AuthConfig;
   php: PhpConfig;
   pathMapping: Record<string, string>;
   defaults: DefaultsConfig;

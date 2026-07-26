@@ -22,6 +22,62 @@ require_project() {
     PROJECT_DIR="$(cd "$target" && pwd)"
     MCP_JSON="$PROJECT_DIR/.mcp.json"
     DETECTIVE_JSON="$PROJECT_DIR/detective.json"
+    DETECTIVE_LOCAL_JSON="$PROJECT_DIR/detective.local.json"
+    GITIGNORE="$PROJECT_DIR/.gitignore"
+}
+
+ignore_local_config() {
+    local entry="detective.local.json"
+
+    if [[ -f "$GITIGNORE" ]] && grep -qxF "$entry" "$GITIGNORE" 2>/dev/null; then
+        echo "  .gitignore: $entry already ignored"
+        return
+    fi
+
+    if [[ -f "$GITIGNORE" ]] && [[ -n "$(tail -c 1 "$GITIGNORE")" ]]; then
+        printf '\n' >> "$GITIGNORE"
+    fi
+
+    printf '%s\n' "$entry" >> "$GITIGNORE"
+    echo "  .gitignore: added $entry"
+}
+
+create_local_config() {
+    if [[ -f "$DETECTIVE_LOCAL_JSON" ]]; then
+        echo "  detective.local.json: already exists"
+        return
+    fi
+
+    cat > "$DETECTIVE_LOCAL_JSON" <<'EOF'
+{
+  "_comment": "Local-only overrides for detective.json. Git-ignored: put credentials here, never in detective.json.",
+  "_formAuthExample": {
+    "auth": {
+      "type": "form",
+      "url": "/api/login",
+      "credentials": { "login": "CHANGE_ME", "password": "CHANGE_ME" },
+      "cookieNames": ["session"]
+    }
+  },
+  "_headerAuthExample": {
+    "auth": {
+      "type": "header",
+      "header": "X-Auth-Token",
+      "valueEnv": "DETECTIVE_TOKEN"
+    }
+  }
+}
+EOF
+    echo "  detective.local.json: created (fill in the auth section if the app requires login)"
+}
+
+remove_local_config() {
+    if [[ -f "$DETECTIVE_LOCAL_JSON" ]]; then
+        rm "$DETECTIVE_LOCAL_JSON"
+        echo "  detective.local.json: removed"
+    else
+        echo "  detective.local.json: not found"
+    fi
 }
 
 add_to_mcp_json() {
@@ -288,6 +344,16 @@ check_status() {
         echo "  detective.json: not found"
     fi
 
+    if [[ -f "$DETECTIVE_LOCAL_JSON" ]]; then
+        if node -e "process.exit(JSON.parse(require('fs').readFileSync('$DETECTIVE_LOCAL_JSON','utf-8')).auth ? 0 : 1)" 2>/dev/null; then
+            echo "  detective.local.json: exists (auth configured)"
+        else
+            echo "  detective.local.json: exists (no auth section)"
+        fi
+    else
+        echo "  detective.local.json: not found"
+    fi
+
     if [[ -f "$DETECTIVE_ENTRY" ]]; then
         echo "  Detective build: OK"
     else
@@ -478,6 +544,8 @@ case "$COMMAND" in
         echo "Linking Detective to $PROJECT_DIR..."
         add_to_mcp_json
         create_detective_json_from_preset "$OPT_PRESET"
+        create_local_config
+        ignore_local_config
         inject_claude_md "$OPT_LANG"
         echo ""
         echo "Done. Restart Claude Code in the project to activate."
@@ -491,6 +559,7 @@ case "$COMMAND" in
         echo "Unlinking Detective from $PROJECT_DIR..."
         remove_from_mcp_json
         remove_detective_json
+        remove_local_config
         remove_claude_md_section
         echo ""
         echo "Done."

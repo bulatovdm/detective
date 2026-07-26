@@ -33,6 +33,7 @@ npm run build
 Скрипт:
 - Добавит `detective` в `.mcp.json` проекта
 - Создаст `detective.json` с базовой конфигурацией
+- Создаст `detective.local.json` (шаблон для кредов) и добавит его в `.gitignore`
 
 Подкоманды:
 ```bash
@@ -158,6 +159,56 @@ xdebug.client_port = 9003
   "skipTlsVerification": true
 }
 ```
+
+## Авторизация
+
+Если приложение закрыто аутентификацией, защищённые URL вернут 401 и брейкпоинты внутри
+контроллера не сработают. Настрой секцию `auth` — Detective сам получит доступ.
+
+Креды кладутся в **`detective.local.json`** — он лежит рядом с `detective.json`, автоматически
+подмешивается поверх него и добавляется в `.gitignore` при `link.sh link`.
+
+### Вход по форме
+
+```jsonc
+{
+  "auth": {
+    "type": "form",
+    "url": "/api/login",
+    "method": "POST",
+    "credentials": { "login": "user", "password": "secret" },
+    "cookieNames": ["session"]
+  }
+}
+```
+
+Detective логинится один раз, кеширует куку и подставляет её во все последующие запросы.
+`cookieNames` — какие куки из ответа оставить (пусто = все).
+
+### API-ключ в заголовке
+
+```jsonc
+{
+  "auth": {
+    "type": "header",
+    "header": "X-Auth-Token",
+    "valueEnv": "DETECTIVE_TOKEN"
+  }
+}
+```
+
+`valueEnv` читает значение из переменной окружения, `value` задаёт его напрямую.
+
+### Разовая передача куки
+
+Без секции `auth` куку можно передать в самом вызове:
+
+```
+debug_request(url: "/admin/page", headers: {"Cookie": "session=..."}, breakpoints: [...])
+```
+
+`XDEBUG_SESSION` и куки приложения **сливаются**, а не перетирают друг друга. Одноимённая
+кука из `headers` имеет приоритет — так можно переопределить и сам `XDEBUG_SESSION`.
 
 ## MCP Tools
 

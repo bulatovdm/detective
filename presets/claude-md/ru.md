@@ -31,3 +31,35 @@ debug_request(url: "/api/endpoint", breakpoints: [{type: "line", file: "app/.../
 # Консольная команда
 debug_command(command: "php bin/console some:command", breakpoints: [{type: "exception", exception: "*"}])
 ```
+
+### Защищённые страницы (авторизация)
+
+Если приложение закрыто аутентификацией, запрос к защищённому URL вернёт 401/редирект,
+и брейкпоинты внутри контроллера не сработают. Не обходи это отключением защиты — настрой
+авторизацию в `detective.local.json` (git-ignored, создаётся при `link`):
+
+```jsonc
+{
+  "auth": {
+    "type": "form",
+    "url": "/api/login",
+    "credentials": { "login": "...", "password": "..." },
+    "cookieNames": ["session_cookie_name"]
+  }
+}
+```
+
+Detective сам залогинится, закеширует куку и подставит её во все запросы.
+Для API-ключа вместо формы:
+
+```jsonc
+{
+  "auth": { "type": "header", "header": "X-Auth-Token", "valueEnv": "DETECTIVE_TOKEN" }
+}
+```
+
+**Куки не конфликтуют**: `XDEBUG_SESSION` и сессия приложения отправляются вместе.
+Можно передать куку и разово — `headers: {"Cookie": "session=..."}` в вызове инструмента;
+она будет слита с `XDEBUG_SESSION`, а не заменит её.
+
+**Секреты — только в `detective.local.json`**, никогда в `detective.json` (тот в git).

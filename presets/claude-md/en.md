@@ -31,3 +31,35 @@ debug_request(url: "/api/endpoint", breakpoints: [{type: "line", file: "app/.../
 # Console command
 debug_command(command: "php bin/console some:command", breakpoints: [{type: "exception", exception: "*"}])
 ```
+
+### Protected pages (authentication)
+
+If the application requires a login, requesting a protected URL returns 401 or a redirect and
+breakpoints inside the controller never fire. Do not work around this by disabling the guard —
+configure authentication in `detective.local.json` (git-ignored, created by `link`):
+
+```jsonc
+{
+  "auth": {
+    "type": "form",
+    "url": "/api/login",
+    "credentials": { "login": "...", "password": "..." },
+    "cookieNames": ["session_cookie_name"]
+  }
+}
+```
+
+Detective logs in on its own, caches the cookie and attaches it to every request.
+For an API key instead of a login form:
+
+```jsonc
+{
+  "auth": { "type": "header", "header": "X-Auth-Token", "valueEnv": "DETECTIVE_TOKEN" }
+}
+```
+
+**Cookies do not clash**: `XDEBUG_SESSION` and the application session are sent together.
+A cookie can also be passed per call — `headers: {"Cookie": "session=..."}` — and it is merged
+with `XDEBUG_SESSION` rather than replacing it.
+
+**Keep secrets in `detective.local.json` only**, never in `detective.json` (that one is committed).
