@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { resolve, dirname } from 'node:path';
 import { loadConfig } from './core/config/ConfigLoader.js';
 import { DetectiveServer } from './core/DetectiveServer.js';
@@ -49,4 +51,12 @@ async function main(): Promise<void> {
   }
 }
 
-main();
+const managementCommands = ['connect', 'link', 'disconnect', 'unlink', 'update', 'status', '--help', '-h'];
+if (managementCommands.includes(process.argv[2] ?? '')) {
+  const script = fileURLToPath(new URL('../scripts/link.sh', import.meta.url));
+  const result = spawnSync('bash', [script, ...process.argv.slice(2)], { stdio: 'inherit' });
+  if (result.error) logger.error(result.error.message);
+  process.exit(result.status ?? 1);
+} else {
+  main();
+}

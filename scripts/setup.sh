@@ -55,7 +55,7 @@ case "${1:-}" in
         echo ""
         echo "Done. Usage:"
         echo "  cd /path/to/project"
-        echo "  detective link . https://myapp.local"
+        echo "  detective connect . --preset default --url https://myapp.local"
         echo "  detective status"
         ;;
 
@@ -69,8 +69,8 @@ case "${1:-}" in
     *)
         echo "Usage: $0 <install|uninstall>"
         echo ""
-        echo "  install    - Build and install 'detective' to /usr/local/bin"
-        echo "  uninstall  - Remove 'detective' from /usr/local/bin"
+        echo "  install    - Build and install 'detective' to ~/.local/bin"
+        echo "  uninstall  - Remove 'detective' from ~/.local/bin"
         exit 1
         ;;
 esac

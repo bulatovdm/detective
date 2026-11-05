@@ -27,20 +27,43 @@ npm run build
 ## Подключение к проекту
 
 ```bash
-./scripts/link.sh link /path/to/project https://myapp.local
+./scripts/setup.sh install
+cd /path/to/project
+detective connect --preset default --url https://myapp.local
 ```
 
-Скрипт:
-- Добавит `detective` в `.mcp.json` проекта
-- Создаст `detective.json` с базовой конфигурацией
-- Создаст `detective.local.json` (шаблон для кредов) и добавит его в `.gitignore`
+Без параметров `detective connect` интерактивно выбирает окружение. Доступны пресеты
+`default`, `self`, `docker`, `whyme-docker`; прежняя команда `link` остаётся алиасом.
+Если `detective.json` уже существует, повторное подключение сохраняет настройки и обновляет MCP.
 
-Подкоманды:
+Команда добавляет сервер `detective` для Claude Code (`.mcp.json`), OpenCode
+(`opencode.json` или существующий `opencode.jsonc`) и Codex (`.codex/config.toml`).
+Другие MCP-серверы и настройки сохраняются. JSONC-комментарии сохраняются;
+TOML сериализуется заново с сохранением значений, без комментариев.
+
+Сервер запускается через `detective serve --config detective.json`: установленная
+команда `detective` должна быть доступна в PATH клиента. Абсолютные пути к установке
+и проекту не записываются. В Docker-пресетах путь хоста задаётся как `.` относительно проекта.
+
+Для нового проекта создаются переносимый базовый `detective.json` и
+`detective.local.json` с параметрами выбранного окружения. Локальный файл также
+подходит для авторизации и других переопределений. Уже существующие файлы Detective
+не перезаписываются. Конфиги клиентов и `detective.local.json` добавляются в `.gitignore`.
+Уже отслеживаемые Git файлы остаются отслеживаемыми; записи MCP в них переносимы.
+Секция инструкции Detective добавляется в `CLAUDE.md`.
+
 ```bash
-./scripts/link.sh link <path> [app-url]   # подключить
-./scripts/link.sh unlink <path>           # отключить
-./scripts/link.sh status <path>           # проверить статус
+detective connect [path] [--preset default|self|docker|whyme-docker] [--lang ru|en]
+detective status [path]
+detective update [path] [--lang ru|en]
+detective disconnect [path]
 ```
+
+`disconnect` (алиас `unlink`) удаляет только записи Detective из MCP-конфигов и его
+секцию инструкции, сохраняя настройки отладки, авторизацию и остальные серверы.
+После подключения перезапустите клиент. Codex загружает проектный конфиг только
+для доверенных проектов: [документация MCP](https://developers.openai.com/codex/mcp).
+Формат OpenCode: [MCP servers](https://opencode.ai/docs/mcp-servers/).
 
 ## Настройка Xdebug
 

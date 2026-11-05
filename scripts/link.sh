@@ -92,68 +92,11 @@ remove_local_config() {
 }
 
 add_to_mcp_json() {
-    if [[ -f "$MCP_JSON" ]]; then
-        if grep -q '"detective"' "$MCP_JSON" 2>/dev/null; then
-            echo "  .mcp.json: detective already configured"
-            return
-        fi
-
-        local temp
-        temp=$(mktemp)
-        node -e "
-            const fs = require('fs');
-            const data = JSON.parse(fs.readFileSync('$MCP_JSON', 'utf-8'));
-            data.mcpServers = data.mcpServers || {};
-            data.mcpServers.detective = {
-                type: 'stdio',
-                command: 'node',
-                args: ['$DETECTIVE_ENTRY', '--config', '$DETECTIVE_JSON']
-            };
-            fs.writeFileSync('$temp', JSON.stringify(data, null, 2) + '\n');
-        "
-        mv "$temp" "$MCP_JSON"
-        echo "  .mcp.json: added detective"
-    else
-        cat > "$MCP_JSON" <<EOF
-{
-  "mcpServers": {
-    "detective": {
-      "type": "stdio",
-      "command": "node",
-      "args": [
-        "$DETECTIVE_ENTRY",
-        "--config",
-        "$DETECTIVE_JSON"
-      ]
-    }
-  }
-}
-EOF
-        echo "  .mcp.json: created"
-    fi
+    node "$SCRIPT_DIR/project-mcp.mjs" connect "$PROJECT_DIR"
 }
 
 remove_from_mcp_json() {
-    if [[ ! -f "$MCP_JSON" ]]; then
-        echo "  .mcp.json: not found"
-        return
-    fi
-
-    if ! grep -q '"detective"' "$MCP_JSON" 2>/dev/null; then
-        echo "  .mcp.json: detective not found"
-        return
-    fi
-
-    local temp
-    temp=$(mktemp)
-    node -e "
-        const fs = require('fs');
-        const data = JSON.parse(fs.readFileSync('$MCP_JSON', 'utf-8'));
-        if (data.mcpServers) delete data.mcpServers.detective;
-        fs.writeFileSync('$temp', JSON.stringify(data, null, 2) + '\n');
-    "
-    mv "$temp" "$MCP_JSON"
-    echo "  .mcp.json: removed detective"
+    node "$SCRIPT_DIR/project-mcp.mjs" disconnect "$PROJECT_DIR"
 }
 
 create_detective_json_from_preset() {
@@ -183,20 +126,24 @@ create_detective_json_from_preset() {
             content="${content//\{\{container\}\}/$OPT_CONTAINER}"
             content="${content//\{\{ide_key\}\}/$OPT_IDE_KEY}"
             content="${content//\{\{container_path\}\}/$OPT_CONTAINER_PATH}"
-            content="${content//\{\{host_path\}\}/$PROJECT_DIR}"
+            content="${content//\{\{host_path\}\}/.}"
             ;;
         whyme-docker)
             content="${content//\{\{app_url\}\}/$OPT_APP_URL}"
             content="${content//\{\{container\}\}/$OPT_CONTAINER}"
-            content="${content//\{\{host_path\}\}/$PROJECT_DIR}"
+            content="${content//\{\{host_path\}\}/.}"
             ;;
         default)
             content="${content//\{\{app_url\}\}/$OPT_APP_URL}"
             ;;
     esac
 
-    echo "$content" > "$DETECTIVE_JSON"
-    echo "  detective.json: created (preset: $preset)"
+    printf '%s\n' '{"app":{"url":"http://localhost:8000"}}' > "$DETECTIVE_JSON"
+    if [[ ! -f "$DETECTIVE_LOCAL_JSON" ]]; then
+        printf '%s\n' "$content" > "$DETECTIVE_LOCAL_JSON"
+        echo "  detective.local.json: created (preset: $preset)"
+    fi
+    echo "  detective.json: created (portable base configuration)"
 }
 
 remove_detective_json() {
@@ -251,74 +198,14 @@ inject_claude_md() {
 }
 
 replace_claude_md_section() {
-    local file="$1"
-    local tpl="$2"
-    local temp
-    temp=$(mktemp)
-
-    node -e "
-        const fs = require('fs');
-        const content = fs.readFileSync('$file', 'utf-8');
-        const tpl = fs.readFileSync('$tpl', 'utf-8');
-        const start = '$CLAUDE_MD_START';
-        const end = '$CLAUDE_MD_END';
-        const regex = new RegExp(
-            start.replace(/[.*+?^\${}()|[\\]\\\\]/g, '\\\\\$&') +
-            '[\\\\s\\\\S]*?' +
-            end.replace(/[.*+?^\${}()|[\\]\\\\]/g, '\\\\\$&')
-        );
-        const block = start + '\n' + tpl + '\n' + end;
-        fs.writeFileSync('$temp', content.replace(regex, block));
-    "
-    mv "$temp" "$file"
+    node "$SCRIPT_DIR/project-instructions.mjs" update "$1" "$2"
 }
 
 remove_claude_md_section() {
     local claude_md
     claude_md=$(find_claude_md)
-
-    if [[ -z "$claude_md" ]]; then
-        echo "  CLAUDE.md: not found"
-        return
-    fi
-
-    if ! grep -q "$CLAUDE_MD_START" "$claude_md" 2>/dev/null; then
-        echo "  CLAUDE.md: no detective section"
-        return
-    fi
-
-    local temp
-    temp=$(mktemp)
-
-    node -e "
-        const fs = require('fs');
-        const content = fs.readFileSync('$claude_md', 'utf-8');
-        const start = '$CLAUDE_MD_START';
-        const end = '$CLAUDE_MD_END';
-        const regex = new RegExp(
-            '\\\\n*' +
-            start.replace(/[.*+?^\${}()|[\\]\\\\]/g, '\\\\\$&') +
-            '[\\\\s\\\\S]*?' +
-            end.replace(/[.*+?^\${}()|[\\]\\\\]/g, '\\\\\$&') +
-            '\\\\n*'
-        );
-        const result = content.replace(regex, '\\n').trim();
-        if (result.length === 0) {
-            fs.unlinkSync('$claude_md');
-        } else {
-            fs.writeFileSync('$temp', result + '\\n');
-        }
-    "
-
-    if [[ -f "$temp" ]] && [[ -s "$temp" ]]; then
-        mv "$temp" "$claude_md"
-        echo "  CLAUDE.md: removed detective section"
-    elif [[ ! -f "$claude_md" ]]; then
-        rm -f "$temp"
-        echo "  CLAUDE.md: removed (was empty)"
-    else
-        rm -f "$temp"
-        echo "  CLAUDE.md: removed detective section"
+    if [[ -n "$claude_md" ]]; then
+        node "$SCRIPT_DIR/project-instructions.mjs" remove "$claude_md"
     fi
 }
 
@@ -520,26 +407,19 @@ prompt_lang() {
 COMMAND="${1:-}"
 
 case "$COMMAND" in
-    link)
+    serve)
+        shift
+        ensure_built
+        exec node "$DETECTIVE_ENTRY" "$@"
+        ;;
+
+    connect|link)
         shift
         parse_flags "$@"
         require_project "${OPT_PROJECT:-}"
         ensure_built
 
-        is_already_linked() {
-            local claude_md
-            claude_md=$(find_claude_md)
-            [[ -f "$MCP_JSON" ]] && grep -q '"detective"' "$MCP_JSON" 2>/dev/null \
-                && [[ -f "$DETECTIVE_JSON" ]] \
-                && [[ -n "$claude_md" ]] && grep -q "$CLAUDE_MD_START" "$claude_md" 2>/dev/null
-        }
-
-        if is_already_linked; then
-            echo "Detective is already linked to $PROJECT_DIR."
-            echo "Use 'detective update' to refresh CLAUDE.md section, or 'detective unlink' first."
-            exit 0
-        fi
-
+        if [[ ! -f "$DETECTIVE_JSON" ]]; then
         prompt_preset
 
         case "$OPT_PRESET" in
@@ -548,8 +428,9 @@ case "$COMMAND" in
             whyme-docker) prompt_whyme_docker_options ;;
             default)      prompt_default_options ;;
         esac
+        fi
 
-        prompt_lang
+        OPT_LANG="${OPT_LANG:-$(detect_claude_md_lang)}"
 
         echo ""
         echo "Linking Detective to $PROJECT_DIR..."
@@ -559,18 +440,16 @@ case "$COMMAND" in
         ignore_local_config
         inject_claude_md "$OPT_LANG"
         echo ""
-        echo "Done. Restart Claude Code in the project to activate."
+        echo "Done. Restart Claude Code, OpenCode or Codex in the project to activate."
         ;;
 
-    unlink)
+    disconnect|unlink)
         shift
         parse_flags "$@"
         require_project "${OPT_PROJECT:-}"
 
         echo "Unlinking Detective from $PROJECT_DIR..."
         remove_from_mcp_json
-        remove_detective_json
-        remove_local_config
         remove_claude_md_section
         echo ""
         echo "Done."
@@ -596,6 +475,7 @@ case "$COMMAND" in
 
         echo "Detective status:"
         check_status
+        node "$SCRIPT_DIR/project-mcp.mjs" status "$PROJECT_DIR"
         ;;
 
     *)
@@ -604,6 +484,8 @@ case "$COMMAND" in
         echo "Usage: $0 <command> [project-path] [options]"
         echo ""
         echo "Commands:"
+        echo "  connect [path] [flags] - Configure Claude Code, OpenCode and Codex"
+        echo "  serve [--config path] - Start the MCP server"
         echo "  link [path] [flags]    - Add Detective to project"
         echo "  unlink [path]          - Remove Detective from project"
         echo "  update [path] [--lang] - Update CLAUDE.md detective section"

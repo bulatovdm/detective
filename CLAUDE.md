@@ -65,13 +65,15 @@ LLM → MCP (stdio) → DetectiveServer → PhpAdapter → DbgpConnection → Xd
 
 ```bash
 ./scripts/setup.sh install                          # симлинк 'detective' в ~/.local/bin
-detective link [path] [--preset self|docker|default] [--lang ru|en]  # интерактивная линковка
+detective connect [path] [--preset self|docker|whyme-docker|default] [--lang ru|en]  # интерактивная линковка
 detective update [path] [--lang ru|en]               # обновить секцию в CLAUDE.md
 detective status [path]                              # проверить конфигурацию
 detective unlink [path]                              # отключить от проекта
 ```
 
 Без аргумента path берётся текущая директория.
+
+`connect` (алиас `link`) настраивает Claude Code, OpenCode и Codex. MCP запускается переносимой командой `detective serve --config detective.json`. Новые конфиги клиентов и `detective.local.json` исключаются через `.gitignore`; уже отслеживаемые файлы остаются отслеживаемыми. Параметры окружения нового проекта записываются в `detective.local.json`, а `detective.json` содержит базовый переносимый конфиг. `disconnect`/`unlink` сохраняет конфиги Detective и авторизацию.
 
 ### Пресеты
 
