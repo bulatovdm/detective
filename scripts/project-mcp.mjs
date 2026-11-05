@@ -49,7 +49,7 @@ const updates = clients.map(client => {
 if (action === 'connect') {
     const ignorePath = join(project, '.gitignore');
     const original = existsSync(ignorePath) ? readFileSync(ignorePath, 'utf8') : '';
-    const entries = [...clients.map(client => `/${client.file}`), '/detective.local.json'];
+    const entries = ['/detective.local.json'];
     const missing = entries.filter(entry => !original.split(/\r?\n/).includes(entry));
     if (missing.length) writeFileSync(ignorePath, `${original}${original && !original.endsWith('\n') ? '\n' : ''}${missing.join('\n')}\n`);
 }

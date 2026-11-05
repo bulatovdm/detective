@@ -73,7 +73,7 @@ detective unlink [path]                              # отключить от �
 
 Без аргумента path берётся текущая директория.
 
-`connect` (алиас `link`) настраивает Claude Code, OpenCode и Codex. MCP запускается переносимой командой `detective serve --config detective.json`. Новые конфиги клиентов и `detective.local.json` исключаются через `.gitignore`; уже отслеживаемые файлы остаются отслеживаемыми. Параметры окружения нового проекта записываются в `detective.local.json`, а `detective.json` содержит базовый переносимый конфиг. `disconnect`/`unlink` сохраняет конфиги Detective и авторизацию.
+`connect` (алиас `link`) настраивает Claude Code, OpenCode и Codex. MCP запускается переносимой командой `detective serve --config detective.json`. В `.gitignore` добавляется только `detective.local.json`. Конфиги клиентов не исключаются из Git, чтобы участники проекта видели необходимые MCP-подключения. Параметры окружения нового проекта записываются в `detective.local.json`, а `detective.json` содержит базовый переносимый конфиг. `disconnect`/`unlink` сохраняет конфиги Detective и авторизацию.
 
 ### Пресеты
 

@@ -37,8 +37,9 @@ describe('project connection', () => {
       expect(content).toContain('other');
       expect(content).not.toContain(project);
       expect(content).not.toContain(process.cwd());
-      expect(readFileSync(join(project, '.gitignore'), 'utf8')).toContain(`/${file}`);
+      expect(readFileSync(join(project, '.gitignore'), 'utf8')).not.toContain(file);
     }
+    expect(readFileSync(join(project, '.gitignore'), 'utf8')).toContain('/detective.local.json');
     expect(readFileSync(join(project, 'opencode.jsonc'), 'utf8')).toContain('// keep me');
     expect(parse(readFileSync(join(project, '.codex/config.toml'), 'utf8')).model).toBe('example');
     run(project, 'disconnect');
