@@ -16,6 +16,10 @@ export class HttpTriggerStrategy implements TriggerStrategy {
     private readonly auth?: AuthResolver,
   ) {}
 
+  async prepare(): Promise<void> {
+    await this.auth?.headers();
+  }
+
   async execute(): Promise<TriggerResult> {
     const request = buildRequest(
       await this.withAuthHeaders(),

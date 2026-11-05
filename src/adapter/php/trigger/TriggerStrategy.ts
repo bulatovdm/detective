@@ -7,5 +7,6 @@ export interface TriggerResult {
 
 export interface TriggerStrategy {
   readonly acceptBeforeTrigger: boolean;
+  prepare(): Promise<void>;
   execute(): Promise<TriggerResult>;
 }

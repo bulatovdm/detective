@@ -49,7 +49,8 @@ configure authentication in `detective.local.json` (git-ignored, created by `lin
 }
 ```
 
-Detective logs in on its own, caches the cookie and attaches it to every request.
+Detective logs in before opening the debugger listener, caches the cookie and attaches it to every request.
+Breakpoints apply to the target request, not to the login request.
 For an API key instead of a login form:
 
 ```jsonc

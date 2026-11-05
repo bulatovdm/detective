@@ -32,7 +32,8 @@ export class DebugRequestTool implements ToolInterface {
       description:
         'Execute an HTTP request to the application with breakpoints set. ' +
         'Returns a snapshot with HTTP response, breakpoint hits (local variables, stack trace), ' +
-        'and evaluated expressions. Paths are relative to the project root. ' +
+        'and evaluated expressions. Configured authentication completes before the debugger listener opens, ' +
+        'so breakpoints apply to the target request. Paths are relative to the project root. ' +
         'Two breakpoint types: line breakpoints {file, line} stop at specific code locations; ' +
         'exception breakpoints {type: "exception", exception: "ExceptionClass"} catch thrown exceptions ' +
         '(use "*" for all exceptions). Both types can be combined — exception breakpoints collect data ' +

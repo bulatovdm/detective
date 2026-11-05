@@ -12,6 +12,10 @@ export class CliTriggerStrategy implements TriggerStrategy {
     private readonly timeoutMs: number,
   ) {}
 
+  prepare(): Promise<void> {
+    return Promise.resolve();
+  }
+
   async execute(): Promise<TriggerResult> {
     const command = [this.trigger.command, ...(this.trigger.args ?? [])].join(' ');
     const env = { XDEBUG_SESSION: this.ideKey };

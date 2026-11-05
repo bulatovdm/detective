@@ -42,6 +42,7 @@ export class PhpDebugSession {
   private readonly commandBuilder = new DbgpCommandBuilder();
   private readonly logger = new Logger('PhpDebugSession');
   private readonly strategyFactory: BreakpointStrategyFactory;
+  private detached = false;
   private initPacket: DbgpInitPacket | null = null;
 
   constructor(
@@ -133,6 +134,7 @@ export class PhpDebugSession {
     try {
       if (this.connection.isConnected) {
         await this.connection.sendCommand(this.commandBuilder.detach());
+        this.detached = true;
       }
     } catch (err) {
       this.logger.warn('Error during session detach', err instanceof Error ? err.message : err);
@@ -142,7 +144,7 @@ export class PhpDebugSession {
   async close(): Promise<void> {
     this.logger.debug(`close() called (connected=${this.connection.isConnected})`);
     try {
-      if (this.connection.isConnected) {
+      if (this.connection.isConnected && !this.detached) {
         await this.connection.sendCommand(this.commandBuilder.stop());
       }
     } catch (err) {

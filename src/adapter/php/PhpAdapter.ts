@@ -78,6 +78,8 @@ export class PhpAdapter implements LanguageAdapterInterface {
     let sessionStage = 'waiting for Xdebug connection';
 
     try {
+      sessionLog.add('Preparing trigger');
+      await triggerStrategy.prepare();
       await session.listen();
       sessionLog.add(`TCP server listening on ${config.php.xdebug.host}:${config.php.xdebug.port}`);
 
